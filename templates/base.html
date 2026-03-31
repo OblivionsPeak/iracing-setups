@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}iRacing Setups{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+  {% if session.user %}
+  <nav class="navbar">
+    <a href="/dashboard" class="nav-brand">iRacing <span>Setups</span></a>
+    <div class="nav-links">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/setups/upload">Upload</a>
+      <a href="/setups">Browse</a>
+      <a href="/compare">Compare</a>
+      <a href="/recommend">Recommend</a>
+      <a href="/gaps">Gap Report</a>
+      <a href="/logout">Log Out</a>
+    </div>
+    <button class="nav-hamburger" onclick="document.getElementById('navDrawer').classList.toggle('open')" aria-label="Menu">&#9776;</button>
+  </nav>
+  <div class="nav-drawer" id="navDrawer">
+    <a href="/dashboard">Dashboard</a>
+    <a href="/setups/upload">Upload Setup</a>
+    <a href="/setups">Browse Setups</a>
+    <a href="/compare">Compare</a>
+    <a href="/recommend">Recommend</a>
+    <a href="/gaps">Gap Report</a>
+    <a href="/logout">Log Out</a>
+  </div>
+  {% endif %}
+
+  <main class="main-content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, msg in messages %}
+          <div class="alert alert-{{ category }}">{{ msg }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

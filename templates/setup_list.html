@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Browse Setups — iRacing Setups{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Setups</h1>
+    <p>{{ setups|length }} setup{{ 's' if setups|length != 1 else '' }} in your library</p>
+  </div>
+  <a href="/setups/upload" class="btn btn-primary">+ Upload</a>
+</div>
+
+<!-- Filters -->
+<form method="GET" action="/setups" class="filter-bar">
+  <div class="form-group">
+    <label class="form-label">Class</label>
+    <select name="class" class="form-control" onchange="this.form.submit()">
+      <option value="">All Classes</option>
+      {% for cls in all_classes %}
+      <option value="{{ cls }}" {{ 'selected' if cls == class_filter else '' }}>{{ cls }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="form-group">
+    <label class="form-label">Car</label>
+    <select name="car" class="form-control" onchange="this.form.submit()">
+      <option value="">All Cars</option>
+      {% for key, name in all_cars %}
+      <option value="{{ key }}" {{ 'selected' if key == car_filter else '' }}>{{ name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="form-group">
+    <label class="form-label">Track</label>
+    <select name="track" class="form-control" onchange="this.form.submit()">
+      <option value="">All Tracks</option>
+      {% for key, name in all_tracks %}
+      <option value="{{ key }}" {{ 'selected' if key == track_filter else '' }}>{{ name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% if car_filter or track_filter or class_filter %}
+  <div class="form-group" style="display:flex; align-items:flex-end;">
+    <a href="/setups" class="btn btn-secondary btn-sm">Clear</a>
+  </div>
+  {% endif %}
+</form>
+
+<!-- Compare controls -->
+<div id="compareBar" style="display:none; background:var(--surface); border:1px solid var(--accent); border-radius:var(--radius); padding:12px 16px; margin-bottom:16px; display:flex; align-items:center; gap:12px;">
+  <span style="font-size:14px; color:var(--muted);">Select 2 setups to compare</span>
+  <span id="compareCount" style="font-size:14px; font-weight:600; color:var(--accent);">0 selected</span>
+  <button class="btn btn-primary btn-sm" onclick="goCompare()">Compare →</button>
+  <button class="btn btn-secondary btn-sm" onclick="clearCompare()">Clear</button>
+</div>
+
+{% if setups %}
+<div class="setup-grid">
+  {% for s in setups %}
+  <div class="setup-row">
+    <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+      <input type="checkbox" class="compare-cb" data-id="{{ s.id }}"
+             style="width:16px; height:16px; cursor:pointer; flex-shrink:0;"
+             onchange="updateCompare()">
+      <div style="min-width:0;">
+        <div class="setup-row-title">
+          <a href="/setups/{{ s.id }}" style="color:var(--text);">{{ s.car_display }}</a>
+        </div>
+        <div class="setup-row-meta">{{ s.track_display }} · <span style="text-transform:capitalize;">{{ s.setup_type }}</span></div>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+      <span class="badge badge-{{ s.car_class|lower|replace(' ','') }}">{{ s.car_class }}</span>
+      <div class="setup-row-actions">
+        <a href="/setups/{{ s.id }}" class="btn btn-secondary btn-sm">View</a>
+        <a href="/setups/{{ s.id }}/download" class="btn btn-secondary btn-sm">↓</a>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <h3>No setups found</h3>
+  <p>{% if car_filter or track_filter or class_filter %}Try clearing the filters.{% else %}Upload your first setup to get started.{% endif %}</p>
+  <a href="/setups/upload" class="btn btn-primary">Upload Setup</a>
+</div>
+{% endif %}
+
+<script>
+const selected = new Set();
+function updateCompare() {
+  document.querySelectorAll('.compare-cb').forEach(cb => {
+    if (cb.checked) selected.add(cb.dataset.id);
+    else selected.delete(cb.dataset.id);
+    if (selected.size > 2) { cb.checked = false; selected.delete(cb.dataset.id); }
+  });
+  const bar = document.getElementById('compareBar');
+  bar.style.display = selected.size > 0 ? 'flex' : 'none';
+  document.getElementById('compareCount').textContent = selected.size + ' selected';
+}
+function goCompare() {
+  const ids = [...selected];
+  if (ids.length === 2) window.location.href = `/compare?a=${ids[0]}&b=${ids[1]}`;
+  else alert('Select exactly 2 setups to compare.');
+}
+function clearCompare() {
+  selected.clear();
+  document.querySelectorAll('.compare-cb').forEach(cb => cb.checked = false);
+  document.getElementById('compareBar').style.display = 'none';
+}
+</script>
+{% endblock %}

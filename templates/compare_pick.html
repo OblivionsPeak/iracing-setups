@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Compare Setups — iRacing Setups{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Compare Setups</h1>
+    <p>Select two setups to compare side-by-side</p>
+  </div>
+</div>
+
+{% if setups %}
+<div class="card" style="max-width:640px;">
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label" style="color:#60a5fa;">Setup A</label>
+      <select id="selA" class="form-control">
+        <option value="">— Select setup —</option>
+        {% for s in setups %}
+        <option value="{{ s.id }}" {{ 'selected' if s.id == id_a else '' }}>{{ s.car_display }} @ {{ s.track_display }} ({{ s.setup_type }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label" style="color:#f97316;">Setup B</label>
+      <select id="selB" class="form-control">
+        <option value="">— Select setup —</option>
+        {% for s in setups %}
+        <option value="{{ s.id }}" {{ 'selected' if s.id == id_b else '' }}>{{ s.car_display }} @ {{ s.track_display }} ({{ s.setup_type }})</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  <button class="btn btn-primary" onclick="goCompare()">Compare →</button>
+</div>
+{% else %}
+<div class="empty-state">
+  <h3>No setups yet</h3>
+  <p>Upload at least two setups to compare them.</p>
+  <a href="/setups/upload" class="btn btn-primary">Upload Setup</a>
+</div>
+{% endif %}
+
+<script>
+function goCompare() {
+  const a = document.getElementById('selA').value;
+  const b = document.getElementById('selB').value;
+  if (!a || !b) { alert('Please select two setups.'); return; }
+  if (a === b) { alert('Please select two different setups.'); return; }
+  window.location.href = `/compare?a=${a}&b=${b}`;
+}
+</script>
+{% endblock %}

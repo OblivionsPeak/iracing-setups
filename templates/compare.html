@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Compare — iRacing Setups{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Setup Comparison</h1>
+    <p>{{ diff_count }} difference{{ 's' if diff_count != 1 else '' }} found</p>
+  </div>
+  <a href="/compare" class="btn btn-secondary btn-sm">← Pick Different</a>
+</div>
+
+<!-- Setup headers -->
+<div class="compare-header" style="margin-bottom:16px; border-radius:var(--radius);">
+  <div style="font-size:13px; color:var(--muted); font-weight:500;">Parameter</div>
+  <div>
+    <div class="compare-col-a">A — {{ setup_a.car_display }}</div>
+    <div style="font-size:12px; color:var(--muted);">{{ setup_a.track_display }} · {{ setup_a.setup_type }}</div>
+  </div>
+  <div>
+    <div class="compare-col-b">B — {{ setup_b.car_display }}</div>
+    <div style="font-size:12px; color:var(--muted);">{{ setup_b.track_display }} · {{ setup_b.setup_type }}</div>
+  </div>
+</div>
+
+<!-- Filter toggle -->
+<div style="margin-bottom:16px; display:flex; gap:8px; align-items:center;">
+  <label style="display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer;">
+    <input type="checkbox" id="diffsOnly" onchange="toggleDiffsOnly()" style="width:16px; height:16px;">
+    Show differences only
+  </label>
+  <span style="font-size:13px; color:var(--muted);">({{ diff_count }} of {{ tabs.values()|sum(attribute='values')|list|sum(attribute='__len__') if tabs else 0 }} params differ)</span>
+</div>
+
+{% for tab_name, sections in tabs.items() %}
+<div style="margin-bottom:24px;">
+  <div style="font-size:16px; font-weight:700; color:var(--accent); margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid var(--border);">{{ tab_name }}</div>
+  <div class="card" style="padding:0; overflow:hidden;">
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th style="width:40%;">Parameter</th>
+          <th class="compare-col-a" style="width:30%;">A</th>
+          <th class="compare-col-b" style="width:30%;">B</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for section_name, rows in sections.items() %}
+        <tr class="compare-section-header">
+          <td colspan="3">{{ section_name }}</td>
+        </tr>
+        {% for row in rows %}
+        <tr class="{{ 'diff-row' if row.is_diff else 'same-row' }}">
+          <td>{{ row.label }}</td>
+          <td class="val-a">{{ row.a or '—' }}</td>
+          <td class="val-b">{{ row.b or '—' }}</td>
+        </tr>
+        {% endfor %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endfor %}
+
+<!-- Action links -->
+<div style="display:flex; gap:10px; margin-top:8px;">
+  <a href="/setups/{{ setup_a.id }}" class="btn btn-secondary btn-sm">View Setup A</a>
+  <a href="/setups/{{ setup_b.id }}" class="btn btn-secondary btn-sm">View Setup B</a>
+  <a href="/setups/{{ setup_a.id }}/download" class="btn btn-secondary btn-sm">↓ Download A</a>
+  <a href="/setups/{{ setup_b.id }}/download" class="btn btn-secondary btn-sm">↓ Download B</a>
+</div>
+
+<script>
+function toggleDiffsOnly() {
+  const checked = document.getElementById('diffsOnly').checked;
+  document.querySelectorAll('.same-row').forEach(r => {
+    r.style.display = checked ? 'none' : '';
+  });
+}
+</script>
+{% endblock %}

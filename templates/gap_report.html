@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Gap Report — iRacing Setups{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Gap Report</h1>
+    <p>Your car × track setup coverage</p>
+  </div>
+  <a href="/setups/upload" class="btn btn-primary btn-sm">+ Upload Setup</a>
+</div>
+
+{% if not ordered_cars %}
+<div class="empty-state">
+  <h3>No setups yet</h3>
+  <p>Upload setups to see your coverage gaps.</p>
+  <a href="/setups/upload" class="btn btn-primary">Upload Setup</a>
+</div>
+{% else %}
+<div style="overflow-x:auto;">
+  <table class="gap-table">
+    <thead>
+      <tr>
+        <th style="text-align:left; min-width:180px;">Car</th>
+        {% for track_key, track_name in tracks %}
+        <th class="rotate"><span title="{{ track_name }}">{{ track_name }}</span></th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for cls, cars in ordered_cars %}
+      <tr>
+        <td colspan="{{ tracks|length + 1 }}"
+            style="background:var(--bg); font-size:11px; font-weight:700; color:var(--muted);
+                   text-transform:uppercase; letter-spacing:0.5px; padding:8px 12px;">
+          {{ cls }}
+        </td>
+      </tr>
+      {% for car in cars %}
+      <tr>
+        <td class="car-name">
+          <a href="/setups?car={{ car.key }}" style="color:var(--text);">{{ car.name }}</a>
+        </td>
+        {% for track_key, track_name in tracks %}
+        <td>
+          {% if (car.key, track_key) in covered %}
+          <span class="gap-cell-yes" title="{{ track_name }}">✓</span>
+          {% else %}
+          <span class="gap-cell-no">·</span>
+          {% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div style="margin-top:16px; font-size:13px; color:var(--muted);">
+  <span style="color:var(--success);">✓</span> = setup in library &nbsp;
+  <span style="color:var(--border);">·</span> = no setup yet
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}iRacing Setups — Setup Manager for Sim Racers{% endblock %}
+{% block content %}
+<div class="hero">
+  <h1>Your iRacing setups,<br><span>organized and ready.</span></h1>
+  <p>Upload your .sto files, compare setups side-by-side, find gaps in your library, and get instant recommendations for any car and track combo.</p>
+  <div class="hero-cta">
+    <a href="/signup" class="btn btn-primary" style="font-size:16px; padding:12px 28px;">Get Started Free</a>
+    <a href="/login"  class="btn btn-secondary" style="font-size:16px; padding:12px 28px;">Log In</a>
+  </div>
+</div>
+
+<div class="features">
+  <div class="feature-card">
+    <div class="feature-icon">📁</div>
+    <h3>Smart Catalog</h3>
+    <p>Upload .sto files and instantly see every parameter decoded — aero, suspension, diff, brakes — organized by tab and section.</p>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon">⚖️</div>
+    <h3>Side-by-Side Compare</h3>
+    <p>Pick any two setups and see exactly what differs, highlighted at a glance. No more manual diffing.</p>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon">🎯</div>
+    <h3>Instant Recommendations</h3>
+    <p>Select a car and track — get your best matching setup from your library with a reason why it fits.</p>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon">🗺️</div>
+    <h3>Gap Report</h3>
+    <p>See your full car × track coverage matrix at a glance. Know exactly which combinations you're missing before race week.</p>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon">🏎️</div>
+    <h3>GT3, GT4, LMP2 &amp; More</h3>
+    <p>Purpose-built for road racing. Supports all GT3, GT4, GTE, LMP2, GTP, and Porsche Cup cars in iRacing.</p>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon">👥</div>
+    <h3>Multi-User</h3>
+    <p>Each driver has their own private setup library. Share the app with your team — everyone keeps their setups separate.</p>
+  </div>
+</div>
+{% endblock %}

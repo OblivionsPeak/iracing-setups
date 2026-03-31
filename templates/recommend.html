@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Recommend a Setup — iRacing Setups{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Setup Recommender</h1>
+    <p>Find the best setup from your library for any car and track</p>
+  </div>
+</div>
+
+<div class="card" style="max-width:560px;">
+  <form method="POST" action="/recommend">
+    <div class="form-group">
+      <label class="form-label">Car</label>
+      <select name="car_key" class="form-control" required>
+        <option value="">— Select car —</option>
+        {% for cls, car_list in cars.items() %}
+        <optgroup label="{{ cls }}">
+          {% for car in car_list %}
+          <option value="{{ car.key }}">{{ car.name }}</option>
+          {% endfor %}
+        </optgroup>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Track</label>
+      <select name="track_key" class="form-control" required>
+        <option value="">— Select track —</option>
+        {% for t in track_list %}
+        <option value="{{ t.key }}">{{ t.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary" style="width:100%">Find Best Setup →</button>
+  </form>
+</div>
+{% endblock %}

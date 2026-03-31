@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}{{ setup.car_display }} at {{ setup.track_display }} — iRacing Setups{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>{{ setup.car_display }}</h1>
+    <p>{{ setup.track_display }} · <span style="text-transform:capitalize;">{{ setup.setup_type }}</span> · <span class="badge badge-{{ setup.car_class|lower|replace(' ','') }}">{{ setup.car_class }}</span></p>
+  </div>
+  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    <a href="/setups/{{ setup.id }}/download" class="btn btn-primary btn-sm">↓ Download .sto</a>
+    <a href="/compare?a={{ setup.id }}" class="btn btn-secondary btn-sm">Compare</a>
+    <form method="POST" action="/setups/{{ setup.id }}/delete" style="display:inline;"
+          onsubmit="return confirm('Delete this setup? This cannot be undone.')">
+      <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+    </form>
+  </div>
+</div>
+
+<div style="font-size:13px; color:var(--muted); margin-bottom:20px;">
+  File: {{ setup.filename }} &nbsp;·&nbsp;
+  Uploaded {{ setup.uploaded_at[:10] if setup.uploaded_at else '—' }}
+  {% if setup.last_used_at %} &nbsp;·&nbsp; Last downloaded {{ setup.last_used_at[:10] }}{% endif %}
+</div>
+
+<!-- Tabs -->
+{% if tabs %}
+<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px;" id="tabNav">
+  {% for tab_name in tabs %}
+  <button class="btn btn-secondary btn-sm tab-btn" data-tab="{{ tab_name }}" onclick="showTab('{{ tab_name }}')">{{ tab_name }}</button>
+  {% endfor %}
+</div>
+
+{% for tab_name, sections in tabs.items() %}
+<div class="tab-panel" id="tab-{{ tab_name }}" style="display:none;">
+  <div class="card" style="padding:0; overflow:hidden;">
+    {% for section_name, rows in sections.items() %}
+    <div class="param-tab-section" style="padding:16px 20px 8px;">
+      <div class="param-section-heading">{{ section_name }}</div>
+      <table class="param-table">
+        <thead>
+          <tr>
+            <th>Parameter</th>
+            <th>Value</th>
+            <th>Range</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td>{{ row.label }}</td>
+            <td class="val">{{ row.metric_value }}</td>
+            <td class="range">
+              {% if row.range_metric %}
+                {{ row.range_metric.min }} – {{ row.range_metric.max }}
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- Setup notes -->
+{% if setup.notes_text %}
+<div class="card" style="margin-top:20px;">
+  <div class="card-title">Setup Notes</div>
+  <div class="notes-block">{{ setup.notes_text }}</div>
+</div>
+{% endif %}
+
+<script>
+function showTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('btn-primary'));
+  const panel = document.getElementById('tab-' + name);
+  if (panel) panel.style.display = 'block';
+  document.querySelectorAll('.tab-btn[data-tab="' + name + '"]').forEach(b => {
+    b.classList.add('btn-primary');
+    b.classList.remove('btn-secondary');
+  });
+}
+// Show first tab by default
+const firstTab = document.querySelector('.tab-btn');
+if (firstTab) showTab(firstTab.dataset.tab);
+</script>
+{% endblock %}

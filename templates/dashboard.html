@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — iRacing Setups{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Dashboard</h1>
+    <p>Your setup library at a glance</p>
+  </div>
+  <a href="/setups/upload" class="btn btn-primary">+ Upload Setup</a>
+</div>
+
+<!-- Stats -->
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-value">{{ total }}</div>
+    <div class="stat-label">Total Setups</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ cars_count }}</div>
+    <div class="stat-label">Cars</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ tracks_count }}</div>
+    <div class="stat-label">Tracks</div>
+  </div>
+</div>
+
+{% if total == 0 %}
+<div class="empty-state">
+  <h3>No setups yet</h3>
+  <p>Upload your first .sto file to get started.</p>
+  <a href="/setups/upload" class="btn btn-primary">Upload a Setup</a>
+</div>
+{% else %}
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start;">
+
+  <!-- Cars breakdown -->
+  <div class="card">
+    <div class="card-title">Cars in Library</div>
+    {% for cls, cars in cars_display %}
+    <div style="margin-bottom:12px;">
+      <div style="font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">{{ cls }}</div>
+      {% for car in cars %}
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid rgba(48,54,61,0.4);">
+        <a href="/setups?car={{ car.key }}" style="color:var(--text); font-size:14px;">{{ car.name }}</a>
+        <span style="font-size:13px; color:var(--muted);">{{ car.count }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Recent setups -->
+  <div class="card">
+    <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
+      Recent Setups
+      <a href="/setups" style="font-size:13px; font-weight:400;">View all</a>
+    </div>
+    {% for s in recent %}
+    <a href="/setups/{{ s.id }}" style="display:block; padding:10px 0; border-bottom:1px solid rgba(48,54,61,0.4); color:var(--text);">
+      <div style="font-size:14px; font-weight:600;">{{ s.car_display }}</div>
+      <div style="font-size:13px; color:var(--muted);">{{ s.track_display }} · {{ s.setup_type|title }}</div>
+    </a>
+    {% endfor %}
+    <div style="margin-top:14px; display:flex; gap:10px;">
+      <a href="/recommend" class="btn btn-secondary btn-sm">Get Recommendation</a>
+      <a href="/gaps"      class="btn btn-secondary btn-sm">Gap Report</a>
+    </div>
+  </div>
+
+</div>
+{% endif %}
+{% endblock %}

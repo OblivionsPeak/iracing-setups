@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Recommendation — iRacing Setups{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Setup Recommendation</h1>
+    <p>{{ car_display }} at {{ track_display }}</p>
+  </div>
+  <a href="/recommend" class="btn btn-secondary btn-sm">← New Search</a>
+</div>
+
+{% if best %}
+<div class="recommend-card">
+  <h2>{{ best.car_display }}</h2>
+  <div style="font-size:15px; color:var(--muted); margin-bottom:4px;">{{ best.track_display }} · <span style="text-transform:capitalize;">{{ best.setup_type }}</span></div>
+  <div style="font-size:13px; color:var(--muted); margin-bottom:20px; font-style:italic;">{{ reason_text }}</div>
+  <div style="display:flex; gap:10px; flex-wrap:wrap;">
+    <a href="/setups/{{ best.id }}" class="btn btn-primary">View Full Setup</a>
+    <a href="/setups/{{ best.id }}/download" class="btn btn-secondary">↓ Download .sto</a>
+    <a href="/compare?a={{ best.id }}" class="btn btn-secondary">Compare with Another</a>
+  </div>
+</div>
+
+{% if reason != 'exact_match' %}
+<div class="card" style="background:rgba(210,153,34,0.06); border-color:var(--warning);">
+  <div style="font-size:13px; color:var(--warning);">
+    ⚠ This is not an exact match for {{ track_display }}.
+    Adjust aero (wing angle), ride heights, and brake bias to suit the track before your session.
+    Consider uploading a dedicated setup for {{ track_display }} to improve future recommendations.
+  </div>
+  <div style="margin-top:12px;">
+    <a href="/setups/upload" class="btn btn-secondary btn-sm">Upload a {{ track_display }} setup</a>
+  </div>
+</div>
+{% endif %}
+
+{% else %}
+<div class="empty-state">
+  <h3>No {{ car_display }} setups found</h3>
+  <p>You don't have any setups for the {{ car_display }} in your library yet.</p>
+  <a href="/setups/upload" class="btn btn-primary">Upload a Setup</a>
+</div>
+{% endif %}
+{% endblock %}
