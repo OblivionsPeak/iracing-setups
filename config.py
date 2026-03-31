@@ -1,7 +1,8 @@
 import os
 
-SUPABASE_URL      = os.environ['SUPABASE_URL']
-SUPABASE_ANON_KEY = os.environ['SUPABASE_ANON_KEY']
-SUPABASE_SVC_KEY  = os.environ['SUPABASE_SERVICE_KEY']
-SECRET_KEY        = os.environ.get('FLASK_SECRET_KEY', 'dev-secret-change-me')
-APP_URL           = os.environ.get('APP_URL', '')
+SECRET_KEY    = os.environ.get('FLASK_SECRET_KEY', 'dev-secret-change-me')
+DATABASE_URL  = os.environ.get('DATABASE_URL', 'sqlite:///iracing_setups.db')
+UPLOAD_FOLDER = os.environ.get(
+    'UPLOAD_FOLDER',
+    os.path.join(os.path.dirname(__file__), 'uploads', 'setups')
+)

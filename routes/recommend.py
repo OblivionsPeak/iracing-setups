@@ -1,38 +1,30 @@
 """Setup recommendation and gap report."""
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash
-from supabase_client import svc_client
-from routes.dashboard import login_required
-from data.cars import car_display_name, car_class, all_cars_grouped, CARS, CLASS_ORDER
-from data.tracks import track_display_name, TRACK_LIST, TRACKS
+from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask_login import login_required, current_user
+from models import Setup
+from data.cars import car_display_name, car_class, all_cars_grouped, CLASS_ORDER
+from data.tracks import track_display_name, TRACK_LIST
 from data.track_categories import get_category, same_category_tracks
 
 bp = Blueprint('recommend', __name__)
 
 
-def _find_best_setup(setups: list, track_key: str) -> tuple[dict | None, str]:
-    """
-    Return (best_setup, reason_string).
-    Priority: exact track > same category > any setup for car.
-    """
-    # 1. Exact match
-    exact = [s for s in setups if s['track_key'] == track_key]
+def _find_best(setups, track_key):
+    exact = [s for s in setups if s.track_key == track_key]
     if exact:
-        # Prefer most recently used, then most recently uploaded
-        exact.sort(key=lambda s: (s.get('last_used_at') or '', s.get('uploaded_at') or ''), reverse=True)
+        exact.sort(key=lambda s: (s.last_used_at or s.uploaded_at), reverse=True)
         return exact[0], 'exact_match'
 
-    # 2. Same category
-    category = get_category(track_key)
-    if category:
-        same_cat = [s for s in setups if s['track_key'] in same_category_tracks(track_key)]
+    cat = get_category(track_key)
+    if cat:
+        same_cat = [s for s in setups if s.track_key in same_category_tracks(track_key)]
         if same_cat:
-            same_cat.sort(key=lambda s: (s.get('last_used_at') or '', s.get('uploaded_at') or ''), reverse=True)
-            return same_cat[0], f'same_category:{category}'
+            same_cat.sort(key=lambda s: (s.last_used_at or s.uploaded_at), reverse=True)
+            return same_cat[0], f'same_category:{cat}'
 
-    # 3. Any setup for this car
     if setups:
-        setups_sorted = sorted(setups, key=lambda s: (s.get('last_used_at') or '', s.get('uploaded_at') or ''), reverse=True)
-        return setups_sorted[0], 'any_car_setup'
+        best = sorted(setups, key=lambda s: (s.last_used_at or s.uploaded_at), reverse=True)[0]
+        return best, 'any_car_setup'
 
     return None, 'no_setups'
 
@@ -46,7 +38,6 @@ def recommend_page():
 @bp.post('/recommend')
 @login_required
 def recommend():
-    user_id   = session['user']['id']
     car_key   = request.form.get('car_key', '').strip()
     track_key = request.form.get('track_key', '').strip()
 
@@ -54,17 +45,8 @@ def recommend():
         flash('Please select both a car and a track.', 'danger')
         return redirect(url_for('recommend.recommend_page'))
 
-    # All setups for this car
-    res = svc_client.table('setups').select(
-        'id, filename, car_key, car_name, track_key, track_name, setup_type, uploaded_at, last_used_at'
-    ).eq('user_id', user_id).eq('car_key', car_key).execute()
-    setups = res.data or []
-
-    best, reason = _find_best_setup(setups, track_key)
-
-    if best:
-        best['car_display']   = best.get('car_name') or car_display_name(best['car_key'])
-        best['track_display'] = best.get('track_name') or track_display_name(best['track_key'])
+    setups = Setup.query.filter_by(user_id=current_user.id, car_key=car_key).all()
+    best, reason = _find_best(setups, track_key)
 
     reason_text = _reason_text(reason, car_key, track_key, best)
 
@@ -80,46 +62,34 @@ def recommend():
     )
 
 
-def _reason_text(reason: str, car_key: str, track_key: str, best) -> str:
+def _reason_text(reason, car_key, track_key, best):
     car   = car_display_name(car_key)
     track = track_display_name(track_key)
     if reason == 'exact_match':
         return f'Found a setup for the {car} specifically at {track}.'
     if reason.startswith('same_category:'):
         cat = reason.split(':')[1].replace('_', ' ').title()
-        best_track = track_display_name(best['track_key']) if best else '—'
-        return (f'No setup for {track} in your library. Recommending your {best_track} setup '
-                f'— both are {cat} circuits with similar characteristics.')
+        best_track = best.track_name if best else '—'
+        return (f'No {track} setup found. Recommending your {best_track} setup — '
+                f'both are {cat} circuits with similar characteristics.')
     if reason == 'any_car_setup':
-        best_track = track_display_name(best['track_key']) if best else '—'
-        return (f'No setup for {track} or a similar circuit. '
-                f'Using your {best_track} setup as a baseline — adjust aero and ride heights for {track}.')
-    return f'No {car} setups found in your library. Upload one to get started.'
+        best_track = best.track_name if best else '—'
+        return (f'No {track} setup or similar circuit found. '
+                f'Using your {best_track} setup as a starting baseline.')
+    return f'No {car} setups in your library yet.'
 
 
 @bp.get('/gaps')
 @login_required
 def gap_report():
-    user_id = session['user']['id']
+    setups = Setup.query.filter_by(user_id=current_user.id).all()
+    covered = {(s.car_key, s.track_key) for s in setups}
 
-    res = svc_client.table('setups').select('car_key, car_name, car_class, track_key') \
-        .eq('user_id', user_id).execute()
-    setups = res.data or []
-
-    # Build coverage set
-    covered = set((s['car_key'], s['track_key']) for s in setups)
-
-    # Cars user has at least one setup for
     user_cars = {}
     for s in setups:
-        k = s['car_key']
-        if k not in user_cars:
-            user_cars[k] = {
-                'name':  s.get('car_name') or car_display_name(k),
-                'class': s.get('car_class') or car_class(k),
-            }
+        if s.car_key not in user_cars:
+            user_cars[s.car_key] = {'name': s.car_name, 'class': s.car_class}
 
-    # Group cars by class
     cars_by_class = {}
     for k, info in user_cars.items():
         cls = info['class']
@@ -130,14 +100,9 @@ def gap_report():
 
     ordered_cars = [(cls, cars_by_class[cls]) for cls in CLASS_ORDER if cls in cars_by_class]
 
-    tracks_used = sorted(
-        {(s['track_key'], track_display_name(s['track_key'])) for s in setups},
+    tracks = sorted(
+        {(s.track_key, s.track_name) for s in setups},
         key=lambda x: x[1]
     )
 
-    return render_template(
-        'gap_report.html',
-        ordered_cars=ordered_cars,
-        tracks=tracks_used,
-        covered=covered,
-    )
+    return render_template('gap_report.html', ordered_cars=ordered_cars, tracks=tracks, covered=covered)

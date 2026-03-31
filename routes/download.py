@@ -1,7 +1,10 @@
-"""Generate signed download URL for a .sto file."""
-from flask import Blueprint, redirect, session, flash, url_for
-from supabase_client import svc_client
-from routes.dashboard import login_required
+"""Serve .sto file download directly from disk."""
+import os
+from datetime import datetime, timezone
+from flask import Blueprint, send_file, flash, redirect, url_for
+from flask_login import login_required, current_user
+from db import db
+from models import Setup
 
 bp = Blueprint('download', __name__)
 
@@ -9,29 +12,18 @@ bp = Blueprint('download', __name__)
 @bp.get('/setups/<setup_id>/download')
 @login_required
 def download(setup_id):
-    user_id = session['user']['id']
+    setup = Setup.query.filter_by(id=setup_id, user_id=current_user.id).first_or_404()
 
-    res = svc_client.table('setups').select('storage_path, filename') \
-        .eq('id', setup_id).eq('user_id', user_id).maybe_single().execute()
-
-    if not res.data or not res.data.get('storage_path'):
-        flash('Setup file not available for download.', 'danger')
+    if not setup.storage_path or not os.path.exists(setup.storage_path):
+        flash('File not available for download. The .sto file may not have been saved.', 'danger')
         return redirect(url_for('setups.detail', setup_id=setup_id))
 
-    storage_path = res.data['storage_path']
+    setup.last_used_at = datetime.now(timezone.utc)
+    db.session.commit()
 
-    try:
-        signed = svc_client.storage.from_('setups').create_signed_url(storage_path, expires_in=60)
-        url = signed.get('signedURL') or signed.get('signed_url') or signed.get('data', {}).get('signedUrl')
-        if url:
-            # Update last_used_at
-            from datetime import datetime, timezone
-            svc_client.table('setups').update({
-                'last_used_at': datetime.now(timezone.utc).isoformat()
-            }).eq('id', setup_id).execute()
-            return redirect(url)
-    except Exception:
-        pass
-
-    flash('Could not generate download link. Please try again.', 'danger')
-    return redirect(url_for('setups.detail', setup_id=setup_id))
+    return send_file(
+        setup.storage_path,
+        as_attachment=True,
+        download_name=setup.filename,
+        mimetype='application/octet-stream',
+    )

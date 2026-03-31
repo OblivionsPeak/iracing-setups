@@ -1,62 +1,45 @@
-"""Dashboard home and login_required decorator."""
-from functools import wraps
-from flask import Blueprint, render_template, redirect, url_for, session
-from supabase_client import svc_client
+"""Dashboard home."""
+from flask import Blueprint, render_template
+from flask_login import login_required, current_user
+from models import Setup
 from data.cars import car_display_name, car_class, CLASS_ORDER
 from data.tracks import track_display_name
 
 bp = Blueprint('dashboard', __name__)
 
 
-def login_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if not session.get('user'):
-            return redirect(url_for('auth.login_page'))
-        return f(*args, **kwargs)
-    return decorated
-
-
 @bp.get('/dashboard')
 @login_required
 def home():
-    user_id = session['user']['id']
-
-    # Summary counts
-    setups_res = svc_client.table('setups').select('id, car_key, car_class, track_key, uploaded_at, last_used_at') \
-        .eq('user_id', user_id).order('uploaded_at', desc=True).execute()
-    setups = setups_res.data or []
+    setups = Setup.query.filter_by(user_id=current_user.id) \
+        .order_by(Setup.uploaded_at.desc()).all()
 
     total      = len(setups)
-    cars_set   = set(s['car_key'] for s in setups)
-    tracks_set = set(s['track_key'] for s in setups)
+    cars_set   = {s.car_key for s in setups}
+    tracks_set = {s.track_key for s in setups}
 
-    # Cars with setup counts, grouped by class
+    # Car counts grouped by class
     car_counts = {}
     for s in setups:
-        k = s['car_key']
-        car_counts[k] = car_counts.get(k, 0) + 1
+        car_counts[s.car_key] = car_counts.get(s.car_key, 0) + 1
 
     cars_by_class = {}
-    for car_key, count in sorted(car_counts.items(), key=lambda x: x[0]):
-        cls = car_class(car_key)
+    for key, count in sorted(car_counts.items()):
+        cls = car_class(key)
         cars_by_class.setdefault(cls, [])
         cars_by_class[cls].append({
-            'key':   car_key,
-            'name':  car_display_name(car_key),
+            'key':   key,
+            'name':  car_display_name(key),
             'count': count,
         })
-    # Ordered by class
     cars_display = [(cls, cars_by_class[cls]) for cls in CLASS_ORDER if cls in cars_by_class]
 
-    # Recent setups (last 5)
-    recent = []
-    for s in setups[:5]:
-        recent.append({
-            **s,
-            'car_display':   car_display_name(s['car_key']),
-            'track_display': track_display_name(s['track_key']),
-        })
+    recent = [{
+        'id':           s.id,
+        'car_display':  s.car_name or car_display_name(s.car_key),
+        'track_display': s.track_name or track_display_name(s.track_key),
+        'setup_type':   s.setup_type,
+    } for s in setups[:5]]
 
     return render_template(
         'dashboard.html',

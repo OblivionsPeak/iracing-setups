@@ -6,11 +6,27 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
-from flask import Flask, render_template, redirect, url_for, session
-from config import SECRET_KEY
+from flask import Flask, render_template, redirect, url_for
+from flask_login import LoginManager, current_user
+from config import SECRET_KEY, DATABASE_URL, UPLOAD_FOLDER
+from db import db
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+db.init_app(app)
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'auth.login_page'
+
+@login_manager.user_loader
+def load_user(user_id):
+    from models import User
+    return db.session.get(User, int(user_id))
 
 from routes.auth      import bp as auth_bp
 from routes.dashboard import bp as dashboard_bp
@@ -26,10 +42,15 @@ app.register_blueprint(compare_bp)
 app.register_blueprint(recommend_bp)
 app.register_blueprint(download_bp)
 
+# Create DB tables and upload folder on first run
+with app.app_context():
+    db.create_all()
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
 
 @app.get('/')
 def index():
-    if session.get('user'):
+    if current_user.is_authenticated:
         return redirect(url_for('dashboard.home'))
     return render_template('landing.html')
 

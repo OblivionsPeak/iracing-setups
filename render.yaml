@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: iracing-setups
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --workers 1 --threads 4 --bind 0.0.0.0:$PORT
+    envVars:
+      - key: FLASK_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        value: sqlite:////data/iracing_setups.db
+      - key: UPLOAD_FOLDER
+        value: /data/setups
+    disk:
+      name: iracing-data
+      mountPath: /data
+      sizeGB: 1
