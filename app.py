@@ -11,7 +11,11 @@ from flask_login import LoginManager, current_user
 from config import SECRET_KEY, DATABASE_URL, UPLOAD_FOLDER
 from db import db
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    template_folder=os.environ.get('FLASK_TEMPLATE_FOLDER', 'templates'),
+    static_folder=os.environ.get('FLASK_STATIC_FOLDER', 'static'),
+)
 app.secret_key = SECRET_KEY
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
