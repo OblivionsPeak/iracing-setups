@@ -4,6 +4,7 @@ Double-click to start the app. Opens in your default browser automatically.
 """
 import sys
 import os
+import json
 import threading
 import webbrowser
 import time
@@ -19,8 +20,19 @@ else:
 DATA_DIR = os.path.join(BASE_DIR, 'iracing_data')
 os.makedirs(DATA_DIR, exist_ok=True)
 
+# Load or generate a persistent secret key
+CONFIG_FILE = os.path.join(DATA_DIR, 'config.json')
+if os.path.exists(CONFIG_FILE):
+    with open(CONFIG_FILE) as f:
+        _cfg = json.load(f)
+    _secret_key = _cfg.get('secret_key') or secrets.token_hex(32)
+else:
+    _secret_key = secrets.token_hex(32)
+with open(CONFIG_FILE, 'w') as f:
+    json.dump({'secret_key': _secret_key}, f)
+
 # Set env vars before importing app
-os.environ.setdefault('FLASK_SECRET_KEY', secrets.token_hex(32))
+os.environ['FLASK_SECRET_KEY'] = _secret_key
 os.environ.setdefault('DATABASE_URL', f"sqlite:///{os.path.join(DATA_DIR, 'iracing_setups.db')}")
 os.environ.setdefault('UPLOAD_FOLDER', os.path.join(DATA_DIR, 'setups'))
 
