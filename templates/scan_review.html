@@ -1,0 +1,384 @@
+{% extends "base.html" %}
+{% block title %}Scan Library — iRacing Setups{% endblock %}
+{% block main_class %}wide-content{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1>Scan Library</h1>
+    <p>Auto-import setups from your iRacing folder</p>
+  </div>
+  <a href="/dashboard" class="btn btn-secondary">Back to Dashboard</a>
+</div>
+
+<!-- Loading state -->
+<div id="scanLoading" class="card" style="text-align:center; padding:48px 24px;">
+  <div class="scan-spinner"></div>
+  <div style="margin-top:16px; color:var(--muted);">Scanning your iRacing setups folder…</div>
+</div>
+
+<!-- Error state -->
+<div id="scanError" style="display:none;">
+  <div class="alert alert-danger" id="scanErrorMsg"></div>
+  <a href="/dashboard" class="btn btn-secondary">Back</a>
+</div>
+
+<!-- Results -->
+<div id="scanResults" style="display:none;">
+
+  <!-- Summary bar -->
+  <div class="card" style="margin-bottom:16px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+      <div>
+        <span id="summaryFound" style="font-weight:700; font-size:16px;"></span>
+        <span style="color:var(--muted); font-size:14px; margin-left:4px;" id="summarySkipped"></span>
+        <span id="summaryReview" style="margin-left:12px; font-size:13px; color:var(--warning); font-weight:600; display:none;">
+          · <span id="reviewCount"></span> need track confirmation
+        </span>
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button id="importAllBtn" class="btn btn-primary" onclick="startImport(false)">Import All</button>
+        <button id="importConfirmedBtn" class="btn btn-secondary" style="display:none;" onclick="startImport(true)">Import Confirmed Only</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty state -->
+  <div id="scanEmpty" style="display:none;" class="empty-state">
+    <h3>All setups already imported</h3>
+    <p>Your library is up to date with your iRacing setups folder.</p>
+    <a href="/setups" class="btn btn-primary">Browse Library</a>
+  </div>
+
+  <!-- Table -->
+  <div id="tableWrap" style="display:none;">
+    <div class="card" style="padding:0; overflow:hidden;">
+      <table class="scan-table" id="scanTable">
+        <thead>
+          <tr>
+            <th style="width:32px; padding:12px 16px;">
+              <input type="checkbox" id="checkAll" onchange="toggleAll(this.checked)" title="Select all">
+            </th>
+            <th>Filename</th>
+            <th>Car</th>
+            <th>Track</th>
+            <th>Type</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="scanTbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Progress overlay -->
+<div id="progressSection" style="display:none;">
+  <div class="card" style="margin-bottom:16px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <span style="font-weight:600; font-size:15px;">Importing…</span>
+      <span id="progressLabel" style="font-size:13px; color:var(--muted);"></span>
+    </div>
+    <div class="scan-progress-track">
+      <div class="scan-progress-fill" id="progressFill"></div>
+    </div>
+  </div>
+
+  <div class="card" style="padding:0; overflow:hidden;">
+    <div class="card-title" style="padding:16px 20px 0;">Import Log</div>
+    <div class="scan-log" id="scanLog"></div>
+  </div>
+
+  <div id="doneActions" style="display:none; margin-top:16px; display:none;">
+    <a href="/setups" class="btn btn-primary">View Your Library</a>
+    <a href="/dashboard" class="btn btn-secondary" style="margin-left:10px;">Dashboard</a>
+  </div>
+</div>
+
+<!-- Track list for dropdowns -->
+<datalist id="trackDatalist">
+  {% for t in track_list %}
+  <option value="{{ t.key }}" data-name="{{ t.name }}">{{ t.name }}</option>
+  {% endfor %}
+</datalist>
+
+<script>
+const TRACK_LIST = {{ track_list | tojson }};
+const trackByKey = {};
+TRACK_LIST.forEach(t => trackByKey[t.key] = t.name);
+
+let scanItems = [];
+let needsReviewCount = 0;
+
+async function runScan() {
+  try {
+    const resp = await fetch('/scan/start', { method: 'POST' });
+    if (!resp.ok) {
+      const d = await resp.json();
+      showError(d.error || 'Scan failed');
+      return;
+    }
+    const data = await resp.json();
+    renderResults(data);
+  } catch (e) {
+    showError('Could not reach the scan endpoint: ' + e.message);
+  }
+}
+
+function showError(msg) {
+  document.getElementById('scanLoading').style.display = 'none';
+  document.getElementById('scanError').style.display = '';
+  document.getElementById('scanErrorMsg').textContent = msg;
+}
+
+function renderResults(data) {
+  document.getElementById('scanLoading').style.display = 'none';
+  document.getElementById('scanResults').style.display = '';
+
+  scanItems = data.items || [];
+  needsReviewCount = scanItems.filter(i => i.needs_review).length;
+
+  document.getElementById('summaryFound').textContent =
+    scanItems.length === 0 ? 'No new setups found' : `${scanItems.length} new setup${scanItems.length !== 1 ? 's' : ''} found`;
+
+  if (data.skipped > 0) {
+    document.getElementById('summarySkipped').textContent =
+      `· ${data.skipped} already imported`;
+  }
+
+  if (needsReviewCount > 0) {
+    document.getElementById('summaryReview').style.display = '';
+    document.getElementById('reviewCount').textContent = needsReviewCount;
+    document.getElementById('importConfirmedBtn').style.display = '';
+  }
+
+  if (scanItems.length === 0) {
+    document.getElementById('scanEmpty').style.display = '';
+    document.getElementById('importAllBtn').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('tableWrap').style.display = '';
+  buildTable();
+}
+
+function buildTable() {
+  const tbody = document.getElementById('scanTbody');
+  tbody.innerHTML = '';
+
+  scanItems.forEach((item, idx) => {
+    const tr = document.createElement('tr');
+    tr.dataset.idx = idx;
+    if (item.needs_review) tr.classList.add('scan-row-review');
+
+    // Checkbox
+    const tdCk = document.createElement('td');
+    tdCk.style.cssText = 'padding:10px 16px; width:32px;';
+    const ck = document.createElement('input');
+    ck.type = 'checkbox';
+    ck.checked = true;
+    ck.dataset.idx = idx;
+    ck.onchange = updateImportButton;
+    tdCk.appendChild(ck);
+    tr.appendChild(tdCk);
+
+    // Filename
+    const tdFile = document.createElement('td');
+    tdFile.style.cssText = 'padding:10px 12px; font-size:13px; color:var(--muted); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+    tdFile.title = item.filename;
+    tdFile.textContent = item.filename;
+    tr.appendChild(tdFile);
+
+    // Car
+    const tdCar = document.createElement('td');
+    tdCar.style.cssText = 'padding:10px 12px; font-size:14px; font-weight:500;';
+    tdCar.textContent = item.car_name;
+    tr.appendChild(tdCar);
+
+    // Track dropdown
+    const tdTrack = document.createElement('td');
+    tdTrack.style.cssText = 'padding:6px 12px; min-width:220px;';
+    const sel = document.createElement('select');
+    sel.className = 'form-control';
+    sel.style.cssText = 'font-size:13px; padding:5px 8px;';
+    if (item.needs_review) sel.style.borderColor = 'var(--warning)';
+    sel.dataset.idx = idx;
+    sel.onchange = function() {
+      scanItems[idx].track_key  = this.value;
+      scanItems[idx].track_name = trackByKey[this.value] || this.value;
+      scanItems[idx].needs_review = !this.value;
+      const row = this.closest('tr');
+      if (this.value) {
+        row.classList.remove('scan-row-review');
+        this.style.borderColor = '';
+        const badge = row.querySelector('.scan-badge-review');
+        if (badge) badge.remove();
+        row.querySelector('.scan-badge-ready').style.display = '';
+      }
+      recalcReviewCount();
+      updateImportButton();
+    };
+
+    // Empty option
+    const optEmpty = document.createElement('option');
+    optEmpty.value = '';
+    optEmpty.textContent = item.needs_review ? '— Select track —' : '';
+    sel.appendChild(optEmpty);
+
+    TRACK_LIST.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.key;
+      opt.textContent = t.name;
+      if (t.key === item.track_key) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    tdTrack.appendChild(sel);
+    tr.appendChild(tdTrack);
+
+    // Setup type
+    const tdType = document.createElement('td');
+    tdType.style.cssText = 'padding:6px 12px;';
+    const typeSel = document.createElement('select');
+    typeSel.className = 'form-control';
+    typeSel.style.cssText = 'font-size:13px; padding:5px 8px; width:auto;';
+    typeSel.dataset.idx = idx;
+    typeSel.onchange = function() { scanItems[idx].setup_type = this.value; };
+    ['race','qualifying','endurance','wet','baseline'].forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t;
+      opt.textContent = t.charAt(0).toUpperCase() + t.slice(1);
+      if (t === item.setup_type) opt.selected = true;
+      typeSel.appendChild(opt);
+    });
+    tdType.appendChild(typeSel);
+    tr.appendChild(tdType);
+
+    // Status badge
+    const tdStatus = document.createElement('td');
+    tdStatus.style.cssText = 'padding:10px 12px;';
+    if (item.needs_review) {
+      tdStatus.innerHTML = '<span class="scan-badge scan-badge-review">Needs Track</span>' +
+                           '<span class="scan-badge scan-badge-ready" style="display:none;">Ready</span>';
+    } else {
+      tdStatus.innerHTML = '<span class="scan-badge scan-badge-ready">Ready</span>';
+    }
+    tr.appendChild(tdStatus);
+
+    tbody.appendChild(tr);
+  });
+}
+
+function recalcReviewCount() {
+  needsReviewCount = scanItems.filter(i => i.needs_review).length;
+  document.getElementById('reviewCount').textContent = needsReviewCount;
+  if (needsReviewCount === 0) {
+    document.getElementById('summaryReview').style.display = 'none';
+    document.getElementById('importConfirmedBtn').style.display = 'none';
+  }
+}
+
+function updateImportButton() {
+  // no-op: always allow import, unconfirmed rows will be skipped
+}
+
+function toggleAll(checked) {
+  document.querySelectorAll('#scanTbody input[type=checkbox]').forEach(ck => {
+    ck.checked = checked;
+  });
+}
+
+async function startImport(confirmedOnly) {
+  // Collect checked rows
+  const checkboxes = document.querySelectorAll('#scanTbody input[type=checkbox]');
+  let toImport = [];
+  checkboxes.forEach(ck => {
+    if (!ck.checked) return;
+    const item = scanItems[parseInt(ck.dataset.idx)];
+    if (confirmedOnly && item.needs_review) return;
+    toImport.push(item);
+  });
+
+  if (toImport.length === 0) {
+    alert('No setups selected to import.');
+    return;
+  }
+
+  // Switch to progress view
+  document.getElementById('scanResults').style.display = 'none';
+  document.getElementById('progressSection').style.display = '';
+
+  const logEl      = document.getElementById('scanLog');
+  const fillEl     = document.getElementById('progressFill');
+  const labelEl    = document.getElementById('progressLabel');
+  let imported = 0, errors = 0, skipped = 0;
+
+  function appendLog(cls, text) {
+    const line = document.createElement('div');
+    line.className = 'scan-log-line ' + cls;
+    line.textContent = text;
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  try {
+    const resp = await fetch('/scan/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(toImport),
+    });
+
+    const reader  = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer    = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop();
+
+      for (const part of parts) {
+        const line = part.trim();
+        if (!line.startsWith('data:')) continue;
+        let evt;
+        try { evt = JSON.parse(line.slice(5).trim()); } catch { continue; }
+
+        if (evt.status === 'done') {
+          imported = evt.imported;
+          errors   = evt.errors;
+          fillEl.style.width = '100%';
+          labelEl.textContent = `Done — ${imported} imported, ${errors} failed`;
+          appendLog('log-done', `Import complete: ${imported} added, ${errors} failed, ${skipped} skipped`);
+          document.getElementById('doneActions').style.display = 'flex';
+          document.getElementById('doneActions').style.gap = '10px';
+          continue;
+        }
+
+        // Update progress bar
+        const pct = Math.round(((evt.index + 1) / evt.total) * 100);
+        fillEl.style.width = pct + '%';
+        labelEl.textContent = `${evt.index + 1} / ${evt.total}`;
+
+        if (evt.status === 'ok') {
+          appendLog('log-ok', `✓  ${evt.car} @ ${evt.track}  —  ${evt.filename}`);
+        } else if (evt.status === 'skip') {
+          skipped++;
+          appendLog('log-skip', `—  Skipped: ${evt.filename}  (${evt.reason})`);
+        } else {
+          errors++;
+          appendLog('log-err', `✗  ${evt.filename}  —  ${evt.reason}`);
+        }
+      }
+    }
+  } catch (e) {
+    appendLog('log-err', 'Stream error: ' + e.message);
+    document.getElementById('doneActions').style.display = 'flex';
+  }
+}
+
+// Kick off scan on page load
+runScan();
+</script>
+{% endblock %}

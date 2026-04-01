@@ -41,6 +41,7 @@ from routes.setups    import bp as setups_bp
 from routes.compare   import bp as compare_bp
 from routes.recommend import bp as recommend_bp
 from routes.download  import bp as download_bp
+from routes.scan      import bp as scan_bp
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(dashboard_bp)
@@ -48,6 +49,7 @@ app.register_blueprint(setups_bp)
 app.register_blueprint(compare_bp)
 app.register_blueprint(recommend_bp)
 app.register_blueprint(download_bp)
+app.register_blueprint(scan_bp)
 
 # Create DB tables and upload folder on first run
 with app.app_context():

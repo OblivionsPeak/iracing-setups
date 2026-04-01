@@ -20,6 +20,7 @@ a = Analysis(
         'routes.compare',
         'routes.recommend',
         'routes.download',
+        'routes.scan',
         'models',
         'db',
         'config',

@@ -6,8 +6,36 @@
     <h1>Dashboard</h1>
     <p>Your setup library at a glance</p>
   </div>
-  <a href="/setups/upload" class="btn btn-primary">+ Upload Setup</a>
+  <div style="display:flex; gap:10px; flex-wrap:wrap;">
+    <a href="/scan/review" class="btn btn-primary">Scan iRacing Folder</a>
+    <a href="/setups/upload" class="btn btn-secondary">+ Upload Setup</a>
+  </div>
 </div>
+
+<!-- Detected folder notice -->
+<div id="folderNotice" style="display:none; margin-bottom:20px;">
+  <div class="alert alert-info" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+    <span>iRacing setups folder: <code id="folderPath" style="font-size:13px;"></code></span>
+    <a href="/scan/review" class="btn btn-secondary btn-sm">Scan Now</a>
+  </div>
+</div>
+<div id="folderMissing" style="display:none; margin-bottom:20px;">
+  <div class="alert alert-warning">iRacing setups folder not found — use <a href="/setups/upload">manual upload</a> instead.</div>
+</div>
+
+<script>
+fetch('/scan/detect-folder')
+  .then(r => r.json())
+  .then(d => {
+    if (d.exists) {
+      document.getElementById('folderPath').textContent = d.path;
+      document.getElementById('folderNotice').style.display = '';
+    } else {
+      document.getElementById('folderMissing').style.display = '';
+    }
+  })
+  .catch(() => {});
+</script>
 
 <!-- Stats -->
 <div class="stat-grid">
