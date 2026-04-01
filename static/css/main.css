@@ -490,9 +490,7 @@ select.form-control { cursor: pointer; }
   line-height: 1;
   user-select: none;
 }
-.star.filled,
-.star-widget:hover .star { color: #f0a500; }
-.star-widget .star:hover ~ .star { color: var(--border); }
+.star.filled { color: #f0a500; }
 .star-inline { color: #f0a500; font-size: 12px; letter-spacing: 1px; }
 
 /* ── Tags ─────────────────────────────────────────────────────────────────── */

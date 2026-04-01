@@ -128,20 +128,35 @@ const firstTab = document.querySelector('.tab-btn');
 if (firstTab) showTab(firstTab.dataset.tab);
 
 // Star rating
+const starWidget = document.querySelector('.star-widget');
+const stars = [...starWidget.querySelectorAll('.star')];
+
+stars.forEach((star, i) => {
+  star.addEventListener('mouseover', () => {
+    stars.forEach((s, j) => s.style.color = j <= i ? '#f0a500' : 'var(--border)');
+  });
+  star.addEventListener('mouseleave', () => renderStars(parseInt(starWidget.dataset.rating) || 0));
+});
+starWidget.addEventListener('mouseleave', () => renderStars(parseInt(starWidget.dataset.rating) || 0));
+
+function renderStars(rating) {
+  stars.forEach((s, i) => {
+    s.style.color = rating && (i + 1) <= rating ? '#f0a500' : 'var(--border)';
+    s.classList.toggle('filled', !!(rating && (i + 1) <= rating));
+  });
+}
+
 function setRating(val) {
-  const current = parseInt(document.querySelector('.star-widget').dataset.rating) || 0;
+  const current = parseInt(starWidget.dataset.rating) || 0;
   const newVal  = current === val ? null : val;
   fetch(`/setups/${SETUP_ID}/rate`, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({rating: newVal}),
   }).then(r => r.json()).then(d => {
-    const widget = document.querySelector('.star-widget');
-    widget.dataset.rating = d.rating || 0;
-    widget.querySelectorAll('.star').forEach((s, i) => {
-      s.classList.toggle('filled', d.rating && (i + 1) <= d.rating);
-    });
-    widget.querySelector('.star-label').textContent = d.rating ? d.rating + '/5' : 'Rate this setup';
+    starWidget.dataset.rating = d.rating || 0;
+    renderStars(d.rating || 0);
+    starWidget.querySelector('.star-label').textContent = d.rating ? d.rating + '/5' : 'Rate this setup';
   });
 }
 

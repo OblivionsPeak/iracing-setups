@@ -6,6 +6,16 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from db import db
 
 
+def _car_display_name(key):
+    from data.cars import car_display_name
+    return car_display_name(key)
+
+
+def _track_display_name(key):
+    from data.tracks import track_display_name
+    return track_display_name(key)
+
+
 class User(db.Model, UserMixin):
     __tablename__ = 'users'
 
@@ -49,6 +59,14 @@ class Setup(db.Model):
 
     params = db.relationship('SetupParam', backref='setup', lazy='dynamic',
                              cascade='all, delete-orphan')
+
+    @property
+    def car_display(self):
+        return self.car_name or _car_display_name(self.car_key)
+
+    @property
+    def track_display(self):
+        return self.track_name or _track_display_name(self.track_key)
 
     def get_decoded_params(self):
         try:

@@ -189,6 +189,7 @@ def list_setups():
     if class_filter:
         query = query.filter_by(car_class=class_filter)
 
+    total_count = query.count()
     pagination = query.order_by(Setup.uploaded_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
@@ -204,6 +205,7 @@ def list_setups():
         'setup_list.html',
         setups=setups,
         pagination=pagination,
+        total_count=total_count,
         all_cars=all_cars,
         all_tracks=all_tracks,
         all_classes=all_classes,
@@ -257,7 +259,6 @@ def advisor_notes():
     if not setup:
         return jsonify({'error': 'No matching setup found in library'}), 404
 
-    from datetime import datetime
     header = f'\n\n--- Advisor notes ({datetime.utcnow().strftime("%Y-%m-%d %H:%M")} UTC) ---\n'
     existing = setup.notes_text or ''
     setup.notes_text = (existing + header + notes)[:8000]

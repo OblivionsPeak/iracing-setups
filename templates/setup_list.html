@@ -4,7 +4,7 @@
 <div class="page-header">
   <div>
     <h1>Setups</h1>
-    <p>{{ pagination.total }} setup{{ 's' if pagination.total != 1 else '' }} in your library</p>
+    <p>{{ total_count }} setup{{ 's' if total_count != 1 else '' }} in your library</p>
   </div>
   <div style="display:flex; gap:8px;">
     <a href="/scan/review" class="btn btn-secondary">Re-scan iRacing Folder</a>
@@ -108,7 +108,7 @@
 
   <span style="font-size:13px; color:var(--muted); padding:0 12px;">
     Page {{ pagination.page }} of {{ pagination.pages }}
-    &nbsp;·&nbsp; {{ pagination.total }} total
+    &nbsp;·&nbsp; {{ total_count }} total
   </span>
 
   {% if pagination.has_next %}
