@@ -15,40 +15,89 @@ bp = Blueprint('scan', __name__)
 
 # Common filename suffixes to strip before track matching
 _SUFFIX_RE = re.compile(
-    r'[_\-](race|quali(fying)?|endurance|wet|dry|baseline|safe|default|'
-    r'oval|road|v\d+|\d+hr|practice|prac|test|hotlap|hl|sprint|setup)$',
+    r'[_\-](race|r|quali(fying)?|q|endurance|endu|end|wet|dry|baseline|'
+    r'safe|default|oval|road|v\d+|\d+hr|practice|prac|test|hotlap|hl|'
+    r'sprint|setup|fixed|open|multiclass|mc|imsa|gng|gng|gt|gtc|lmp|'
+    r'no\d*|round\d*|week\d*|w\d+|s\d+|01|02|03|04|05|06|07|08|09|10|'
+    r'11|12|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)$',
+    re.IGNORECASE,
+)
+
+# Regex to remove leading season/week/series noise tokens before matching
+# Matches things like: 25S3, 2025S2, W05, W09, GNG, IMSA, VRS, PMCD, EE
+_NOISE_TOKEN_RE = re.compile(
+    r'^(\d{2,4}s\d+|w\d+|gn?g|imsa|vrs|pmcd|ee|gt[34c]?|lmp[23]?|'
+    r'gtp|gte|cup|pro|am|sr|jr|[a-z]{2,4}\d+)$',
     re.IGNORECASE,
 )
 
 # Aliases for common abbreviations not handled by fuzzy match
 TRACK_ALIASES = {
+    # Virginia
+    'vir':              'virginia',
+    'virginia':         'virginia',
+    # Nürburgring
     'nords':            'nurburgring_nordschleife',
     'nordschleife':     'nurburgring_nordschleife',
     'nurb':             'nurburgring_gp',
     'nurburgring':      'nurburgring_gp',
+    # Le Mans
     'lemans':           'le_mans',
     'le_mans':          'le_mans',
+    'lemans24':         'le_mans',
+    # Watkins Glen
     'watkins':          'watkins_glen',
     'glen':             'watkins_glen',
+    # Daytona
+    'daytona':          'daytona_road',
+    'daytona24':        'daytona_road',
+    # Sebring
+    'sbr':              'sebring',
+    'sebring12':        'sebring',
+    # Road courses
     'road_atl':         'road_atlanta',
     'road_am':          'road_america',
+    # Laguna Seca
     'laguna':           'laguna_seca',
+    # Indianapolis
     'indy':             'indianapolis_road',
     'indianapolis':     'indianapolis_road',
-    'daytona':          'daytona_road',
+    # Red Bull Ring
     'redbull':          'red_bull_ring',
     'red_bull':         'red_bull_ring',
     'rbr':              'red_bull_ring',
+    # Phillip Island
     'phillip':          'phillip_island',
+    # Paul Ricard
     'paul':             'paul_ricard',
     'ricard':           'paul_ricard',
+    # Mid-Ohio
     'mid_oh':           'mid_ohio',
     'midohio':          'mid_ohio',
+    # Lime Rock
     'limerock':         'lime_rock',
     'lime':             'lime_rock',
+    # Long Beach
     'longbeach':        'long_beach',
-    'sbr':              'sebring',
+    # Okayama (common misspelling)
+    'okyama':           'okayama',
+    'okayama':          'okayama',
+    # Interlagos
     'interlagos':       'interlagos',
+    # Brands Hatch
+    'brands':           'brands_hatch',
+    # Charlotte Roval
+    'roval':            'charlotte_roval',
+    'charlotte':        'charlotte_roval',
+    # Oulton Park
+    'oulton':           'oulton_park',
+    # Phillip Island
+    'phillip':          'phillip_island',
+    # Suzuka
+    'suzuka':           'suzuka',
+    # Spa
+    'spa':              'spa',
+    'francorchamps':    'spa',
 }
 
 # Lowercase car folder name → car_key (iRacing folder names match our keys)
@@ -127,13 +176,21 @@ def _fuzzy_match_track(stem: str) -> tuple[str, str, float]:
     cleaned stem, then every n-gram of tokens (1, 2, 3 tokens) extracted
     from the filename. Returns the highest-confidence result found.
     """
-    normalized = stem.lower().replace('-', '_').replace(' ', '_')
+    # Normalise: hyphens, spaces, dots all become underscores
+    normalized = stem.lower().replace('-', '_').replace(' ', '_').replace('.', '_')
+
+    # Tokenise, then drop noise tokens (season codes, week numbers, series names)
+    raw_tokens = [t for t in re.split(r'[_\s]+', normalized) if t]
+    tokens = [t for t in raw_tokens if not _NOISE_TOKEN_RE.match(t) and len(t) >= 3]
+    # Fall back to all tokens if filtering removed everything useful
+    if not tokens:
+        tokens = [t for t in raw_tokens if len(t) >= 3]
 
     # Build all candidates to try, in priority order:
-    # 1. Full stem with suffixes stripped
-    # 2. All 3-token, 2-token, 1-token windows from the raw token list
-    tokens = [t for t in re.split(r'[_\s]+', normalized) if t]
-    candidates = [_strip_suffixes(normalized)]
+    # 1. Full stem with suffixes stripped (using filtered tokens)
+    # 2. All 3-token, 2-token, 1-token windows from the filtered token list
+    filtered_stem = '_'.join(tokens)
+    candidates = [_strip_suffixes(filtered_stem), _strip_suffixes(normalized)]
     for n in (3, 2, 1):
         for i in range(len(tokens) - n + 1):
             candidates.append('_'.join(tokens[i:i + n]))
@@ -153,7 +210,7 @@ def _infer_setup_type(stem: str) -> str:
     s = stem.lower()
     if re.search(r'quali', s):
         return 'qualifying'
-    if re.search(r'endur', s):
+    if re.search(r'endur|endu\b', s):
         return 'endurance'
     if re.search(r'wet', s):
         return 'wet'
