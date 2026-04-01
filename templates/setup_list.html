@@ -4,7 +4,7 @@
 <div class="page-header">
   <div>
     <h1>Setups</h1>
-    <p>{{ setups|length }} setup{{ 's' if setups|length != 1 else '' }} in your library</p>
+    <p>{{ pagination.total }} setup{{ 's' if pagination.total != 1 else '' }} in your library</p>
   </div>
   <div style="display:flex; gap:8px;">
     <a href="/scan/review" class="btn btn-secondary">Re-scan iRacing Folder</a>
@@ -13,7 +13,7 @@
 </div>
 
 <!-- Filters -->
-<form method="GET" action="/setups" class="filter-bar">
+<form method="GET" action="/setups" class="filter-bar" id="filterForm">
   <div class="form-group">
     <label class="form-label">Class</label>
     <select name="class" class="form-control" onchange="this.form.submit()">
@@ -48,27 +48,43 @@
   {% endif %}
 </form>
 
-<!-- Compare controls -->
-<div id="compareBar" style="display:none; background:var(--surface); border:1px solid var(--accent); border-radius:var(--radius); padding:12px 16px; margin-bottom:16px; display:flex; align-items:center; gap:12px;">
-  <span style="font-size:14px; color:var(--muted);">Select 2 setups to compare</span>
-  <span id="compareCount" style="font-size:14px; font-weight:600; color:var(--accent);">0 selected</span>
-  <button class="btn btn-primary btn-sm" onclick="goCompare()">Compare →</button>
-  <button class="btn btn-secondary btn-sm" onclick="clearCompare()">Clear</button>
+<!-- Bulk action bar -->
+<div id="bulkBar" style="display:none; background:var(--surface); border:1px solid var(--accent); border-radius:var(--radius); padding:12px 16px; margin-bottom:16px; display:none; align-items:center; gap:12px; flex-wrap:wrap;">
+  <span id="bulkCount" style="font-size:14px; font-weight:600; color:var(--accent);">0 selected</span>
+  <button class="btn btn-danger btn-sm" onclick="bulkDelete()">Delete Selected</button>
+  <button class="btn btn-secondary btn-sm" onclick="clearBulk()">Clear</button>
+  <span style="font-size:13px; color:var(--muted); margin-left:4px;">— or —</span>
+  <button class="btn btn-secondary btn-sm" onclick="goCompare()">Compare 2 →</button>
 </div>
 
 {% if setups %}
 <div class="setup-grid">
+  <!-- Select all row -->
+  <div style="display:flex; align-items:center; gap:12px; padding:8px 0; border-bottom:1px solid var(--border); margin-bottom:4px;">
+    <input type="checkbox" id="selectAll" style="width:16px;height:16px;cursor:pointer;" onchange="toggleSelectAll(this.checked)">
+    <span style="font-size:12px; color:var(--muted);">Select all on this page</span>
+  </div>
+
   {% for s in setups %}
   <div class="setup-row">
     <div style="display:flex; align-items:center; gap:12px; min-width:0;">
-      <input type="checkbox" class="compare-cb" data-id="{{ s.id }}"
+      <input type="checkbox" class="row-cb" data-id="{{ s.id }}"
              style="width:16px; height:16px; cursor:pointer; flex-shrink:0;"
-             onchange="updateCompare()">
+             onchange="updateBulkBar()">
       <div style="min-width:0;">
-        <div class="setup-row-title">
+        <div class="setup-row-title" style="display:flex; align-items:center; gap:8px;">
           <a href="/setups/{{ s.id }}" style="color:var(--text);">{{ s.car_display }}</a>
+          {% if s.rating %}
+          <span class="star-inline">{{ '★' * s.rating }}{{ '☆' * (5 - s.rating) }}</span>
+          {% endif %}
         </div>
-        <div class="setup-row-meta">{{ s.track_display }} · <span style="text-transform:capitalize;">{{ s.setup_type }}</span></div>
+        <div class="setup-row-meta">{{ s.track_display }} · <span style="text-transform:capitalize;">{{ s.setup_type }}</span>
+          {% if s.tags %}
+            {% for tag in s.tags.split(',') %}
+            <span class="tag-chip tag-chip-sm">{{ tag }}</span>
+            {% endfor %}
+          {% endif %}
+        </div>
         <div style="font-size:11px; color:var(--muted); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ s.filename }}">{{ s.filename }}</div>
       </div>
     </div>
@@ -82,6 +98,25 @@
   </div>
   {% endfor %}
 </div>
+
+<!-- Pagination -->
+{% if pagination.pages > 1 %}
+<div class="pagination" style="margin-top:24px;">
+  {% if pagination.has_prev %}
+  <a href="?page={{ pagination.prev_num }}{% if car_filter %}&car={{ car_filter }}{% endif %}{% if track_filter %}&track={{ track_filter }}{% endif %}{% if class_filter %}&class={{ class_filter }}{% endif %}" class="btn btn-secondary btn-sm">← Prev</a>
+  {% endif %}
+
+  <span style="font-size:13px; color:var(--muted); padding:0 12px;">
+    Page {{ pagination.page }} of {{ pagination.pages }}
+    &nbsp;·&nbsp; {{ pagination.total }} total
+  </span>
+
+  {% if pagination.has_next %}
+  <a href="?page={{ pagination.next_num }}{% if car_filter %}&car={{ car_filter }}{% endif %}{% if track_filter %}&track={{ track_filter }}{% endif %}{% if class_filter %}&class={{ class_filter }}{% endif %}" class="btn btn-secondary btn-sm">Next →</a>
+  {% endif %}
+</div>
+{% endif %}
+
 {% else %}
 <div class="empty-state">
   <h3>No setups found</h3>
@@ -91,26 +126,51 @@
 {% endif %}
 
 <script>
-const selected = new Set();
-function updateCompare() {
-  document.querySelectorAll('.compare-cb').forEach(cb => {
-    if (cb.checked) selected.add(cb.dataset.id);
-    else selected.delete(cb.dataset.id);
-    if (selected.size > 2) { cb.checked = false; selected.delete(cb.dataset.id); }
+const selectedIds = new Set();
+
+function updateBulkBar() {
+  document.querySelectorAll('.row-cb').forEach(cb => {
+    if (cb.checked) selectedIds.add(cb.dataset.id);
+    else selectedIds.delete(cb.dataset.id);
   });
-  const bar = document.getElementById('compareBar');
-  bar.style.display = selected.size > 0 ? 'flex' : 'none';
-  document.getElementById('compareCount').textContent = selected.size + ' selected';
+  const bar = document.getElementById('bulkBar');
+  bar.style.display = selectedIds.size > 0 ? 'flex' : 'none';
+  document.getElementById('bulkCount').textContent = selectedIds.size + ' selected';
 }
+
+function toggleSelectAll(checked) {
+  document.querySelectorAll('.row-cb').forEach(cb => {
+    cb.checked = checked;
+    if (checked) selectedIds.add(cb.dataset.id);
+    else selectedIds.delete(cb.dataset.id);
+  });
+  updateBulkBar();
+}
+
+function clearBulk() {
+  selectedIds.clear();
+  document.querySelectorAll('.row-cb').forEach(cb => cb.checked = false);
+  document.getElementById('selectAll').checked = false;
+  document.getElementById('bulkBar').style.display = 'none';
+}
+
+async function bulkDelete() {
+  if (!selectedIds.size) return;
+  if (!confirm(`Delete ${selectedIds.size} setup(s)? This cannot be undone.`)) return;
+  const resp = await fetch('/setups/bulk-delete', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ids: [...selectedIds]}),
+  });
+  const d = await resp.json();
+  if (d.deleted) window.location.reload();
+  else alert('Delete failed: ' + JSON.stringify(d));
+}
+
 function goCompare() {
-  const ids = [...selected];
+  const ids = [...selectedIds];
   if (ids.length === 2) window.location.href = `/compare?a=${ids[0]}&b=${ids[1]}`;
   else alert('Select exactly 2 setups to compare.');
-}
-function clearCompare() {
-  selected.clear();
-  document.querySelectorAll('.compare-cb').forEach(cb => cb.checked = false);
-  document.getElementById('compareBar').style.display = 'none';
 }
 </script>
 {% endblock %}

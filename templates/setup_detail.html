@@ -9,8 +9,9 @@
   <div style="display:flex; gap:8px; flex-wrap:wrap;">
     <a href="/setups/{{ setup.id }}/download" class="btn btn-primary btn-sm">↓ Download .sto</a>
     <a href="http://localhost:7701?car={{ setup.car_key }}&track={{ setup.track_key }}"
-       target="_blank" class="btn btn-secondary btn-sm" id="advisorBtn">Analyze Telemetry</a>
+       target="_blank" class="btn btn-secondary btn-sm">Analyze Telemetry</a>
     <a href="/compare?a={{ setup.id }}" class="btn btn-secondary btn-sm">Compare</a>
+    <a href="/setups/{{ setup.id }}/history" class="btn btn-secondary btn-sm">History</a>
     <form method="POST" action="/setups/{{ setup.id }}/delete" style="display:inline;"
           onsubmit="return confirm('Delete this setup? This cannot be undone.')">
       <button type="submit" class="btn btn-danger btn-sm">Delete</button>
@@ -18,10 +19,45 @@
   </div>
 </div>
 
-<div style="font-size:13px; color:var(--muted); margin-bottom:20px;">
+<div style="font-size:13px; color:var(--muted); margin-bottom:16px;">
   File: {{ setup.filename }} &nbsp;·&nbsp;
   Uploaded {{ setup.uploaded_at.strftime('%Y-%m-%d') if setup.uploaded_at else '—' }}
   {% if setup.last_used_at %} &nbsp;·&nbsp; Last downloaded {{ setup.last_used_at.strftime('%Y-%m-%d') }}{% endif %}
+</div>
+
+<!-- Rating + Tags row -->
+<div style="display:flex; align-items:center; gap:24px; flex-wrap:wrap; margin-bottom:20px;">
+  <!-- Star rating -->
+  <div class="star-widget" data-setup="{{ setup.id }}" data-rating="{{ setup.rating or 0 }}">
+    {% for i in range(1, 6) %}
+    <span class="star {{ 'filled' if setup.rating and i <= setup.rating else '' }}" data-val="{{ i }}" onclick="setRating({{ i }})">★</span>
+    {% endfor %}
+    <span class="star-label" style="font-size:12px; color:var(--muted); margin-left:6px;">
+      {% if setup.rating %}{{ setup.rating }}/5{% else %}Rate this setup{% endif %}
+    </span>
+  </div>
+
+  <!-- Tags -->
+  <div class="tags-editor" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    <div id="tagChips" style="display:flex; gap:6px; flex-wrap:wrap;">
+      {% if setup.tags %}
+        {% for tag in setup.tags.split(',') %}
+        <span class="tag-chip">{{ tag }}</span>
+        {% endfor %}
+      {% else %}
+        <span style="font-size:12px; color:var(--muted);">No tags</span>
+      {% endif %}
+    </div>
+    <button class="btn btn-secondary btn-sm" onclick="document.getElementById('tagInput').style.display=''; this.style.display='none'; document.getElementById('tagInput').focus()">+ Tag</button>
+    <div id="tagInput" style="display:none;">
+      <input type="text" id="tagInputVal" class="form-control" style="width:220px; font-size:13px; padding:4px 8px; display:inline-block;"
+             placeholder="fast, wet, baseline… (comma-separated)"
+             value="{{ setup.tags or '' }}"
+             onkeydown="if(event.key==='Enter'){saveTags()}"
+      >
+      <button class="btn btn-primary btn-sm" onclick="saveTags()">Save</button>
+    </div>
+  </div>
 </div>
 
 <!-- Tabs -->
@@ -76,6 +112,8 @@
 {% endif %}
 
 <script>
+const SETUP_ID = '{{ setup.id }}';
+
 function showTab(name) {
   document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('btn-primary'));
@@ -86,8 +124,44 @@ function showTab(name) {
     b.classList.remove('btn-secondary');
   });
 }
-// Show first tab by default
 const firstTab = document.querySelector('.tab-btn');
 if (firstTab) showTab(firstTab.dataset.tab);
+
+// Star rating
+function setRating(val) {
+  const current = parseInt(document.querySelector('.star-widget').dataset.rating) || 0;
+  const newVal  = current === val ? null : val;
+  fetch(`/setups/${SETUP_ID}/rate`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({rating: newVal}),
+  }).then(r => r.json()).then(d => {
+    const widget = document.querySelector('.star-widget');
+    widget.dataset.rating = d.rating || 0;
+    widget.querySelectorAll('.star').forEach((s, i) => {
+      s.classList.toggle('filled', d.rating && (i + 1) <= d.rating);
+    });
+    widget.querySelector('.star-label').textContent = d.rating ? d.rating + '/5' : 'Rate this setup';
+  });
+}
+
+// Tags
+function saveTags() {
+  const val = document.getElementById('tagInputVal').value;
+  fetch(`/setups/${SETUP_ID}/tags`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({tags: val}),
+  }).then(r => r.json()).then(d => {
+    const chips = document.getElementById('tagChips');
+    if (d.tags && d.tags.length) {
+      chips.innerHTML = d.tags.map(t => `<span class="tag-chip">${t}</span>`).join('');
+    } else {
+      chips.innerHTML = '<span style="font-size:12px;color:var(--muted);">No tags</span>';
+    }
+    document.getElementById('tagInput').style.display = 'none';
+    document.querySelector('.tags-editor .btn').style.display = '';
+  });
+}
 </script>
 {% endblock %}

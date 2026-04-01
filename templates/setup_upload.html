@@ -4,13 +4,19 @@
 <div class="page-header">
   <div>
     <h1>Upload Setup</h1>
-    <p>Select a .sto file to add to your library</p>
+    <p>Add a .sto file to your library</p>
   </div>
 </div>
 
-<div class="card" style="max-width:560px;">
-  <form method="POST" action="/setups/upload" enctype="multipart/form-data">
+<!-- Tab switcher -->
+<div style="display:flex; gap:8px; margin-bottom:20px;">
+  <button class="btn btn-primary btn-sm" id="tabFileBtn" onclick="switchTab('file')">Upload File</button>
+  <button class="btn btn-secondary btn-sm" id="tabUrlBtn" onclick="switchTab('url')">Import from URL</button>
+</div>
 
+<!-- File upload tab -->
+<div id="tabFile" class="card" style="max-width:560px;">
+  <form method="POST" action="/setups/upload" enctype="multipart/form-data">
     <div class="form-group">
       <label class="form-label">Setup File (.sto)</label>
       <input type="file" name="sto_file" class="form-control" accept=".sto" required>
@@ -18,7 +24,6 @@
         iRacing setup files are stored in <code style="font-size:11px;">Documents/iRacing/setups/</code>
       </div>
     </div>
-
     <div class="form-group">
       <label class="form-label">Track</label>
       <select name="track_key" class="form-control" required>
@@ -28,23 +33,94 @@
         {% endfor %}
       </select>
     </div>
-
     <div class="form-group">
       <label class="form-label">Setup Type</label>
       <select name="setup_type" class="form-control">
         <option value="race">Race</option>
-        <option value="quali">Qualifying</option>
+        <option value="qualifying">Qualifying</option>
         <option value="endurance">Endurance</option>
         <option value="wet">Wet</option>
         <option value="baseline">Baseline</option>
-        <option value="safe">Safe / Conservative</option>
       </select>
     </div>
-
     <button type="submit" class="btn btn-primary" style="width:100%">Upload &amp; Decode</button>
   </form>
   <p style="font-size:12px; color:var(--muted); margin-top:12px; text-align:center;">
-    Parameters are decoded instantly. The car is detected automatically from the file.
+    The car is detected automatically from the file. Re-uploading the same filename saves the previous version to history.
   </p>
 </div>
+
+<!-- URL import tab -->
+<div id="tabUrl" class="card" style="max-width:560px; display:none;">
+  <div class="form-group">
+    <label class="form-label">Setup URL</label>
+    <input type="url" id="urlInput" class="form-control" placeholder="https://…/setup.sto" autocomplete="off">
+    <div style="font-size:12px; color:var(--muted); margin-top:4px;">
+      Paste a direct download link to a .sto file (VRS, iRacing forum, Google Drive, etc.)
+    </div>
+  </div>
+  <div class="form-group">
+    <label class="form-label">Track</label>
+    <select id="urlTrack" class="form-control">
+      <option value="">— Select a track —</option>
+      {% for t in track_list %}
+      <option value="{{ t.key }}">{{ t.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="form-group">
+    <label class="form-label">Setup Type</label>
+    <select id="urlType" class="form-control">
+      <option value="race">Race</option>
+      <option value="qualifying">Qualifying</option>
+      <option value="endurance">Endurance</option>
+      <option value="wet">Wet</option>
+      <option value="baseline">Baseline</option>
+    </select>
+  </div>
+  <button class="btn btn-primary" style="width:100%" onclick="importUrl()">Fetch &amp; Import</button>
+  <div id="urlStatus" style="margin-top:12px; display:none;"></div>
+</div>
+
+<script>
+function switchTab(tab) {
+  document.getElementById('tabFile').style.display = tab === 'file' ? '' : 'none';
+  document.getElementById('tabUrl').style.display  = tab === 'url'  ? '' : 'none';
+  document.getElementById('tabFileBtn').className  = tab === 'file' ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm';
+  document.getElementById('tabUrlBtn').className   = tab === 'url'  ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm';
+}
+
+async function importUrl() {
+  const url   = document.getElementById('urlInput').value.trim();
+  const track = document.getElementById('urlTrack').value;
+  const type  = document.getElementById('urlType').value;
+  const statusEl = document.getElementById('urlStatus');
+
+  if (!url)   { alert('Please enter a URL.'); return; }
+  if (!track) { alert('Please select a track.'); return; }
+
+  statusEl.style.display = '';
+  statusEl.innerHTML = '<div style="color:var(--muted);font-size:13px;">Fetching and decoding…</div>';
+
+  try {
+    const resp = await fetch('/setups/import-url', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({url, track_key: track, setup_type: type}),
+    });
+    const d = await resp.json();
+    if (d.ok) {
+      const msg = d.updated
+        ? `Updated existing setup — previous version saved to history.`
+        : `Imported: ${d.car} at ${d.track}`;
+      statusEl.innerHTML = `<div class="alert alert-success">${msg} <a href="/setups/${d.setup_id}">View →</a></div>`;
+      document.getElementById('urlInput').value = '';
+    } else {
+      statusEl.innerHTML = `<div class="alert alert-danger">Import failed: ${d.error}</div>`;
+    }
+  } catch(e) {
+    statusEl.innerHTML = `<div class="alert alert-danger">Network error: ${e.message}</div>`;
+  }
+}
+</script>
 {% endblock %}

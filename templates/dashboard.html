@@ -12,29 +12,50 @@
   </div>
 </div>
 
+<!-- Season banner -->
+{% if season %}
+<div class="season-banner">
+  <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+    <div>
+      <span class="season-label">{{ season.label }}</span>
+      <span class="season-week">Week {{ season.week }}</span>
+    </div>
+    <div style="font-size:13px; color:var(--muted);">
+      {% if season.days_left <= 14 %}
+        <span style="color:var(--warning);">⚠ {{ season.days_left }} day{{ 's' if season.days_left != 1 }} left this season</span>
+        {% if season.next_label %} — {{ season.next_label }} starts soon{% endif %}
+      {% else %}
+        {{ season.days_left }} days remaining in the season
+      {% endif %}
+    </div>
+    {% if season_gap_cars %}
+    <div style="font-size:13px; color:var(--muted);">
+      No new setups this season for:
+      {% for car in season_gap_cars %}
+      <a href="/setups?car={{ car.key }}" style="color:var(--warning);">{{ car.name }}</a>{% if not loop.last %}, {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
 <!-- Detected folder notice -->
-<div id="folderNotice" style="display:none; margin-bottom:20px;">
+<div id="folderNotice" style="display:none; margin-bottom:16px;">
   <div class="alert alert-info" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
     <span>iRacing setups folder: <code id="folderPath" style="font-size:13px;"></code></span>
     <a href="/scan/review" class="btn btn-secondary btn-sm">Scan Now</a>
   </div>
 </div>
-<div id="folderMissing" style="display:none; margin-bottom:20px;">
+<div id="folderMissing" style="display:none; margin-bottom:16px;">
   <div class="alert alert-warning">iRacing setups folder not found — use <a href="/setups/upload">manual upload</a> instead.</div>
 </div>
 
 <script>
-fetch('/scan/detect-folder')
-  .then(r => r.json())
-  .then(d => {
-    if (d.exists) {
-      document.getElementById('folderPath').textContent = d.path;
-      document.getElementById('folderNotice').style.display = '';
-    } else {
-      document.getElementById('folderMissing').style.display = '';
-    }
-  })
-  .catch(() => {});
+fetch('/scan/detect-folder').then(r=>r.json()).then(d=>{
+  if(d.exists){document.getElementById('folderPath').textContent=d.path;document.getElementById('folderNotice').style.display='';}
+  else{document.getElementById('folderMissing').style.display='';}
+}).catch(()=>{});
 </script>
 
 <!-- Stats -->
@@ -79,16 +100,22 @@ fetch('/scan/detect-folder')
     {% endfor %}
   </div>
 
-  <!-- Recent setups -->
+  <!-- Recently used -->
   <div class="card">
     <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
-      Recent Setups
+      Recently Used
       <a href="/setups" style="font-size:13px; font-weight:400;">View all</a>
     </div>
     {% for s in recent %}
     <a href="/setups/{{ s.id }}" style="display:block; padding:10px 0; border-bottom:1px solid rgba(48,54,61,0.4); color:var(--text);">
-      <div style="font-size:14px; font-weight:600;">{{ s.car_display }}</div>
-      <div style="font-size:13px; color:var(--muted);">{{ s.track_display }} · {{ s.setup_type|title }}</div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-size:14px; font-weight:600;">{{ s.car_display }}</span>
+        {% if s.rating %}<span class="star-inline" style="font-size:11px;">{{ '★' * s.rating }}</span>{% endif %}
+      </div>
+      <div style="font-size:13px; color:var(--muted);">
+        {{ s.track_display }} · {{ s.setup_type|title }}
+        {% if s.last_used_at %}· <span style="color:var(--muted);">used {{ s.last_used_at.strftime('%b %d') }}</span>{% endif %}
+      </div>
     </a>
     {% endfor %}
     <div style="margin-top:14px; display:flex; gap:10px;">

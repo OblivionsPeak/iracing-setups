@@ -480,6 +480,59 @@ select.form-control { cursor: pointer; }
 .log-skip { color: var(--muted); }
 .log-done { color: var(--text); font-weight: 600; margin-top: 4px; }
 
+/* ── Star rating ──────────────────────────────────────────────────────────── */
+.star-widget { display: flex; align-items: center; gap: 2px; }
+.star {
+  font-size: 22px;
+  color: var(--border);
+  cursor: pointer;
+  transition: color 0.1s;
+  line-height: 1;
+  user-select: none;
+}
+.star.filled,
+.star-widget:hover .star { color: #f0a500; }
+.star-widget .star:hover ~ .star { color: var(--border); }
+.star-inline { color: #f0a500; font-size: 12px; letter-spacing: 1px; }
+
+/* ── Tags ─────────────────────────────────────────────────────────────────── */
+.tag-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: rgba(232, 93, 42, 0.15);
+  border: 1px solid rgba(232, 93, 42, 0.35);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+}
+.tag-chip-sm { padding: 1px 6px; font-size: 11px; margin-left: 4px; }
+
+/* ── Season banner ────────────────────────────────────────────────────────── */
+.season-banner {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 20px;
+  margin-bottom: 20px;
+}
+.season-label { font-size: 16px; font-weight: 700; color: var(--accent); }
+.season-week  { font-size: 14px; color: var(--muted); margin-left: 10px; }
+
+/* ── Pagination ───────────────────────────────────────────────────────────── */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* ── Notes block: preserve line breaks ───────────────────────────────────── */
+.notes-block { white-space: pre-wrap; font-size: 13px; line-height: 1.7; color: var(--text); }
+
+/* ── Diff table ───────────────────────────────────────────────────────────── */
+.diff-changed td { background: rgba(218, 54, 51, 0.05); }
+
 /* ── Mobile ───────────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .nav-links     { display: none; }

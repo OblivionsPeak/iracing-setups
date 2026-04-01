@@ -3,11 +3,11 @@ import os
 import re
 import json
 import requests as req
-from datetime import datetime
+from datetime import datetime, timezone
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, jsonify
 from flask_login import login_required, current_user
 from db import db
-from models import Setup, SetupParam
+from models import Setup, SetupParam, SetupHistory
 from data.cars import car_display_name, car_class
 from data.tracks import track_display_name, TRACK_LIST
 
@@ -94,6 +94,37 @@ def upload():
     rows    = decoded['rows']
     notes   = _extract_notes(file_bytes)
 
+    # If the same filename+car already exists, snapshot it and update in place
+    existing = Setup.query.filter_by(
+        user_id=current_user.id, car_key=car_key, filename=filename
+    ).first()
+    if existing:
+        snap = SetupHistory(
+            setup_id       = existing.id,
+            user_id        = current_user.id,
+            decoded_params = existing.decoded_params,
+        )
+        db.session.add(snap)
+        existing.track_key      = track_key
+        existing.track_name     = track_name or track_display_name(track_key)
+        existing.setup_type     = setup_type
+        existing.decoded_params = json.dumps(rows)
+        existing.uploaded_at    = datetime.now(timezone.utc)
+        if notes:
+            existing.notes_text = notes[:4000]
+        db.session.flush()
+        SetupParam.query.filter_by(setup_id=existing.id).delete()
+        params = [
+            SetupParam(setup_id=existing.id, user_id=current_user.id,
+                       tab=row.get('tab'), section=row.get('section'),
+                       label=row.get('label', ''), value=row.get('metric_value', ''))
+            for row in rows if row.get('is_mapped')
+        ]
+        db.session.add_all(params)
+        db.session.commit()
+        flash(f'Updated existing setup for {car_display_name(car_key)} — previous version saved to history.', 'success')
+        return redirect(url_for('setups.detail', setup_id=existing.id))
+
     setup = Setup(
         user_id        = current_user.id,
         filename       = filename,
@@ -147,6 +178,9 @@ def list_setups():
     track_filter = request.args.get('track', '')
     class_filter = request.args.get('class', '')
 
+    page = request.args.get('page', 1, type=int)
+    per_page = 50
+
     query = Setup.query.filter_by(user_id=current_user.id)
     if car_filter:
         query = query.filter_by(car_key=car_filter)
@@ -155,15 +189,21 @@ def list_setups():
     if class_filter:
         query = query.filter_by(car_class=class_filter)
 
-    setups = query.order_by(Setup.uploaded_at.desc()).all()
+    pagination = query.order_by(Setup.uploaded_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    setups = pagination.items
 
-    all_cars   = sorted({(s.car_key, s.car_name) for s in setups}, key=lambda x: x[1])
-    all_tracks = sorted({(s.track_key, s.track_name) for s in setups}, key=lambda x: x[1])
-    all_classes = sorted({s.car_class for s in setups})
+    # Filter dropdowns built from full unfiltered set for usability
+    all_setups = Setup.query.filter_by(user_id=current_user.id).all()
+    all_cars    = sorted({(s.car_key, s.car_name) for s in all_setups}, key=lambda x: x[1])
+    all_tracks  = sorted({(s.track_key, s.track_name) for s in all_setups}, key=lambda x: x[1])
+    all_classes = sorted({s.car_class for s in all_setups})
 
     return render_template(
         'setup_list.html',
         setups=setups,
+        pagination=pagination,
         all_cars=all_cars,
         all_tracks=all_tracks,
         all_classes=all_classes,
@@ -241,3 +281,174 @@ def delete(setup_id):
     db.session.commit()
     flash('Setup deleted.', 'success')
     return redirect(url_for('setups.list_setups'))
+
+
+@bp.post('/setups/bulk-delete')
+@login_required
+def bulk_delete():
+    ids = request.form.getlist('ids')
+    if not ids:
+        data = request.get_json(force=True) or {}
+        ids = data.get('ids', [])
+    if not ids:
+        return jsonify({'error': 'No IDs provided'}), 400
+
+    setups = Setup.query.filter(
+        Setup.id.in_(ids),
+        Setup.user_id == current_user.id,
+    ).all()
+
+    count = 0
+    for setup in setups:
+        if setup.storage_path and os.path.exists(setup.storage_path):
+            # Only delete uploaded copies — never delete original iRacing files
+            upload_folder = current_app.config.get('UPLOAD_FOLDER', '')
+            if upload_folder and setup.storage_path.startswith(upload_folder):
+                try:
+                    os.remove(setup.storage_path)
+                except Exception:
+                    pass
+        db.session.delete(setup)
+        count += 1
+
+    db.session.commit()
+    return jsonify({'deleted': count})
+
+
+@bp.post('/setups/<setup_id>/rate')
+@login_required
+def rate(setup_id):
+    setup = Setup.query.filter_by(id=setup_id, user_id=current_user.id).first_or_404()
+    rating = request.get_json(force=True).get('rating')
+    if rating is None:
+        # Toggle off if same rating clicked again
+        setup.rating = None
+    else:
+        try:
+            r = int(rating)
+            setup.rating = r if 1 <= r <= 5 else None
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid rating'}), 400
+    db.session.commit()
+    return jsonify({'rating': setup.rating})
+
+
+@bp.post('/setups/<setup_id>/tags')
+@login_required
+def update_tags(setup_id):
+    setup = Setup.query.filter_by(id=setup_id, user_id=current_user.id).first_or_404()
+    tags_raw = (request.get_json(force=True) or {}).get('tags', '')
+    # Normalise: lowercase, strip whitespace, deduplicate, max 10 tags
+    tags = list(dict.fromkeys(
+        t.strip().lower() for t in re.split(r'[,\s]+', tags_raw) if t.strip()
+    ))[:10]
+    setup.tags = ','.join(tags)
+    db.session.commit()
+    return jsonify({'tags': tags})
+
+
+@bp.get('/setups/<setup_id>/history')
+@login_required
+def history(setup_id):
+    setup = Setup.query.filter_by(id=setup_id, user_id=current_user.id).first_or_404()
+    snapshots = SetupHistory.query.filter_by(
+        setup_id=setup_id, user_id=current_user.id
+    ).order_by(SetupHistory.saved_at.desc()).all()
+    return render_template('setup_history.html', setup=setup, snapshots=snapshots)
+
+
+@bp.post('/setups/import-url')
+@login_required
+def import_url():
+    data       = request.get_json(force=True) or {}
+    url        = (data.get('url') or '').strip()
+    track_key  = (data.get('track_key') or '').strip()
+    setup_type = (data.get('setup_type') or 'race').strip()
+
+    if not url:
+        return jsonify({'error': 'URL is required'}), 400
+    if not track_key:
+        return jsonify({'error': 'Track is required'}), 400
+
+    # Only allow http/https
+    if not url.lower().startswith(('http://', 'https://')):
+        return jsonify({'error': 'Only http/https URLs are supported'}), 400
+
+    try:
+        r = req.get(url, timeout=20, allow_redirects=True)
+        if r.status_code != 200:
+            return jsonify({'error': f'Could not fetch URL (HTTP {r.status_code})'}), 400
+    except Exception as e:
+        return jsonify({'error': f'Download failed: {e}'}), 400
+
+    # Derive filename from URL or Content-Disposition header
+    cd = r.headers.get('Content-Disposition', '')
+    m  = re.search(r'filename="?([^";\n]+)"?', cd)
+    filename = m.group(1).strip() if m else url.split('/')[-1].split('?')[0]
+    if not filename.lower().endswith('.sto'):
+        filename += '.sto'
+
+    file_bytes = r.content
+    decoded, status_code = _decode_sto_verbose(file_bytes, filename)
+    if not decoded or not decoded.get('rows'):
+        reason = 'unsupported_car' if status_code == 422 else 'decode_failed'
+        return jsonify({'error': reason}), 400
+
+    car_key = decoded.get('carName', 'unknown')
+    rows    = decoded['rows']
+    notes   = _extract_notes(file_bytes)
+
+    # Version snapshot if same filename+car already exists
+    existing = Setup.query.filter_by(
+        user_id=current_user.id, car_key=car_key, filename=filename
+    ).first()
+    if existing:
+        snap = SetupHistory(
+            setup_id       = existing.id,
+            user_id        = current_user.id,
+            decoded_params = existing.decoded_params,
+        )
+        db.session.add(snap)
+        existing.decoded_params = json.dumps(rows)
+        existing.notes_text     = notes[:4000] if notes else existing.notes_text
+        existing.uploaded_at    = datetime.now(timezone.utc)
+        db.session.flush()
+        SetupParam.query.filter_by(setup_id=existing.id).delete()
+        params = [
+            SetupParam(setup_id=existing.id, user_id=current_user.id,
+                       tab=row.get('tab'), section=row.get('section'),
+                       label=row.get('label', ''), value=row.get('metric_value', ''))
+            for row in rows if row.get('is_mapped')
+        ]
+        db.session.add_all(params)
+        db.session.commit()
+        return jsonify({'ok': True, 'setup_id': existing.id, 'updated': True,
+                        'car': car_display_name(car_key),
+                        'track': track_display_name(track_key)})
+
+    setup = Setup(
+        user_id        = current_user.id,
+        filename       = filename,
+        car_name       = car_display_name(car_key),
+        car_key        = car_key,
+        car_class      = car_class(car_key),
+        track_name     = track_display_name(track_key),
+        track_key      = track_key,
+        setup_type     = setup_type,
+        notes_text     = notes[:4000] if notes else None,
+        decoded_params = json.dumps(rows),
+    )
+    db.session.add(setup)
+    db.session.flush()
+
+    params = [
+        SetupParam(setup_id=setup.id, user_id=current_user.id,
+                   tab=row.get('tab'), section=row.get('section'),
+                   label=row.get('label', ''), value=row.get('metric_value', ''))
+        for row in rows if row.get('is_mapped')
+    ]
+    db.session.add_all(params)
+    db.session.commit()
+    return jsonify({'ok': True, 'setup_id': setup.id, 'updated': False,
+                    'car': car_display_name(car_key),
+                    'track': track_display_name(track_key)})

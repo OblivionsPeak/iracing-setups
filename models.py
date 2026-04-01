@@ -42,6 +42,8 @@ class Setup(db.Model):
     notes_text    = db.Column(db.Text)
     decoded_params = db.Column(db.Text, nullable=False, default='[]')  # JSON
     storage_path  = db.Column(db.String(500))
+    rating        = db.Column(db.Integer)                              # 1–5 stars
+    tags          = db.Column(db.String(500))                          # comma-separated
     uploaded_at   = db.Column(db.DateTime, default=datetime.utcnow)
     last_used_at  = db.Column(db.DateTime)
 
@@ -53,6 +55,18 @@ class Setup(db.Model):
             return json.loads(self.decoded_params)
         except Exception:
             return []
+
+
+class SetupHistory(db.Model):
+    """Snapshot of decoded_params saved before a setup is overwritten on re-upload."""
+    __tablename__ = 'setup_history'
+
+    id            = db.Column(db.Integer, primary_key=True)
+    setup_id      = db.Column(db.String(36), db.ForeignKey('setups.id'),
+                              nullable=False, index=True)
+    user_id       = db.Column(db.Integer, nullable=False, index=True)
+    decoded_params = db.Column(db.Text, nullable=False, default='[]')
+    saved_at      = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 class SetupParam(db.Model):

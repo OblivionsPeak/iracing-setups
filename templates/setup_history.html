@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Version History — {{ setup.car_display }} — iRacing Setups{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Version History</h1>
+    <p>{{ setup.car_display }} · {{ setup.track_display }} · {{ setup.filename }}</p>
+  </div>
+  <a href="/setups/{{ setup.id }}" class="btn btn-secondary">← Back to Setup</a>
+</div>
+
+{% if not snapshots %}
+<div class="empty-state">
+  <h3>No previous versions</h3>
+  <p>A snapshot is saved automatically each time you re-upload or re-import the same setup file.</p>
+</div>
+{% else %}
+<div class="card" style="padding:0; overflow:hidden;">
+  <table class="param-table" style="width:100%;">
+    <thead>
+      <tr>
+        <th style="padding:12px 20px;">Saved</th>
+        <th style="padding:12px 20px;">Parameters</th>
+        <th style="padding:12px 20px;">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for snap in snapshots %}
+      {% set rows = snap.decoded_params | fromjson %}
+      <tr>
+        <td style="padding:12px 20px; font-size:14px;">{{ snap.saved_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td style="padding:12px 20px; font-size:13px; color:var(--muted);">{{ rows | length }} total</td>
+        <td style="padding:12px 20px;">
+          <button class="btn btn-secondary btn-sm" onclick="toggleDiff({{ loop.index }})">Show Diff</button>
+        </td>
+      </tr>
+      <tr id="diff-{{ loop.index }}" style="display:none;">
+        <td colspan="3" style="padding:0 20px 16px;">
+          <div class="diff-table-wrap" id="diff-content-{{ loop.index }}"
+               data-snap='{{ snap.decoded_params | e }}'></div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+const CURRENT_PARAMS = {{ setup.decoded_params | safe }};
+const currentMap = {};
+CURRENT_PARAMS.forEach(r => { if (r.is_mapped) currentMap[r.label] = r.metric_value; });
+
+function toggleDiff(idx) {
+  const row = document.getElementById('diff-' + idx);
+  if (row.style.display !== 'none') { row.style.display = 'none'; return; }
+
+  const wrap = document.getElementById('diff-content-' + idx);
+  if (!wrap.dataset.rendered) {
+    const snapRows = JSON.parse(wrap.dataset.snap);
+    const snapMap  = {};
+    snapRows.forEach(r => { if (r.is_mapped) snapMap[r.label] = r.metric_value; });
+
+    const allLabels = new Set([...Object.keys(currentMap), ...Object.keys(snapMap)]);
+    let html = '<table class="param-table" style="margin-top:8px;"><thead><tr><th>Parameter</th><th>Previous</th><th>Current</th></tr></thead><tbody>';
+    let diffCount = 0;
+    allLabels.forEach(label => {
+      const prev = snapMap[label]    ?? '—';
+      const curr = currentMap[label] ?? '—';
+      if (prev !== curr) {
+        diffCount++;
+        html += `<tr class="diff-changed"><td>${label}</td><td style="color:var(--danger);">${prev}</td><td style="color:var(--success);">${curr}</td></tr>`;
+      }
+    });
+    html += '</tbody></table>';
+    if (diffCount === 0) html = '<p style="font-size:13px;color:var(--muted);padding-top:8px;">No mapped parameter changes detected.</p>';
+    else html = `<p style="font-size:12px;color:var(--muted);margin-bottom:4px;">${diffCount} parameter${diffCount!==1?'s':''} changed</p>` + html;
+    wrap.innerHTML = html;
+    wrap.dataset.rendered = '1';
+  }
+  row.style.display = '';
+}
+</script>
+{% endif %}
+{% endblock %}

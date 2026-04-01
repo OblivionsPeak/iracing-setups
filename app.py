@@ -29,6 +29,9 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 db.init_app(app)
 
+import json as _json
+app.jinja_env.filters['fromjson'] = _json.loads
+
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'auth.login_page'
