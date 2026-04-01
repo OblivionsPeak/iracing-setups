@@ -9,7 +9,7 @@ from db import db
 from models import Setup, SetupParam
 from data.cars import CARS, car_display_name, car_class
 from data.tracks import TRACKS, track_display_name
-from routes.setups import _decode_sto, _extract_notes
+from routes.setups import _decode_sto, _decode_sto_verbose, _extract_notes
 
 bp = Blueprint('scan', __name__)
 
@@ -128,6 +128,17 @@ TRACK_ALIASES = {
 
 # Lowercase car folder name → car_key (iRacing folder names match our keys)
 _CAR_FOLDER_MAP = {k.lower(): k for k in CARS}
+
+# Car folder prefixes that setupdelta cannot decode — skip entirely during scan
+_UNSUPPORTED_PREFIXES = (
+    'stockcars',
+    'trucks',
+    'superformula',
+    'indycar',
+    'mx5',
+    'dirt',
+    'oval',
+)
 
 
 def _find_iracing_folder() -> str | None:
@@ -277,6 +288,8 @@ def scan_start():
         folder_path = os.path.join(setups_root, folder_name)
         if not os.path.isdir(folder_path):
             continue
+        if folder_name.lower().startswith(_UNSUPPORTED_PREFIXES):
+            continue
 
         car_key = _CAR_FOLDER_MAP.get(folder_name.lower(), folder_name.lower())
         car_display = car_display_name(car_key)
@@ -385,11 +398,19 @@ def scan_stream():
                 continue
 
             # Decode via setupdelta
-            decoded = _decode_sto(file_bytes, filename)
+            decoded, status_code = _decode_sto_verbose(file_bytes, filename)
             if not decoded or not decoded.get('rows'):
                 errors += 1
+                if status_code == 422:
+                    reason = 'unsupported_car'
+                elif status_code == 0:
+                    reason = 'api_timeout'
+                elif status_code != 200:
+                    reason = f'api_error_{status_code}'
+                else:
+                    reason = 'decode_failed'
                 yield _sse({'index': i, 'total': len(items), 'status': 'error',
-                            'filename': filename, 'reason': 'decode_failed'})
+                            'filename': filename, 'reason': reason})
                 continue
 
             # Use API-confirmed car key if available

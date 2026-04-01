@@ -18,6 +18,17 @@ SETUPDELTA_TIMEOUT = 20
 
 
 def _decode_sto(file_bytes: bytes, filename: str) -> dict | None:
+    """
+    Returns decoded dict on success, or None on failure.
+    On API error, attaches '_status_code' to None — callers can inspect
+    by calling _decode_sto_verbose instead.
+    """
+    result, _ = _decode_sto_verbose(file_bytes, filename)
+    return result
+
+
+def _decode_sto_verbose(file_bytes: bytes, filename: str) -> tuple[dict | None, int]:
+    """Returns (decoded_dict_or_None, http_status_code). 0 = network/timeout error."""
     try:
         resp = req.post(
             SETUPDELTA_API,
@@ -29,12 +40,12 @@ def _decode_sto(file_bytes: bytes, filename: str) -> dict | None:
             timeout=SETUPDELTA_TIMEOUT,
         )
         if resp.status_code == 200:
-            return resp.json()
+            return resp.json(), 200
+        return None, resp.status_code
     except req.exceptions.Timeout:
-        pass
+        return None, 0
     except Exception:
-        pass
-    return None
+        return None, 0
 
 
 def _extract_notes(file_bytes: bytes) -> str:
