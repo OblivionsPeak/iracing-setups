@@ -8,6 +8,8 @@
   </div>
   <div style="display:flex; gap:8px; flex-wrap:wrap;">
     <a href="/setups/{{ setup.id }}/download" class="btn btn-primary btn-sm">↓ Download .sto</a>
+    <a href="http://localhost:7701?car={{ setup.car_key }}&track={{ setup.track_key }}"
+       target="_blank" class="btn btn-secondary btn-sm" id="advisorBtn">Analyze Telemetry</a>
     <a href="/compare?a={{ setup.id }}" class="btn btn-secondary btn-sm">Compare</a>
     <form method="POST" action="/setups/{{ setup.id }}/delete" style="display:inline;"
           onsubmit="return confirm('Delete this setup? This cannot be undone.')">

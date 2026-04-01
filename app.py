@@ -9,7 +9,7 @@ load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 
-from flask import Flask, render_template, redirect, url_for, request
+from flask import Flask, render_template, redirect, url_for, request, make_response
 from flask_login import LoginManager, current_user, login_user
 from config import SECRET_KEY, DATABASE_URL, UPLOAD_FOLDER
 from db import db
@@ -91,6 +91,25 @@ def index():
         return redirect(url_for('dashboard.home'))
     return render_template('landing.html')
 
+
+@app.after_request
+def allow_advisor_cors(response):
+    """Allow the Setup Advisor (localhost:7701) to POST to /api/* endpoints."""
+    origin = request.headers.get('Origin', '')
+    if origin.startswith('http://localhost:'):
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+    return response
+
+@app.route('/api/advisor-notes', methods=['OPTIONS'])
+def advisor_notes_preflight():
+    resp = make_response('', 204)
+    resp.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
+    resp.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    resp.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+    return resp
 
 @app.errorhandler(404)
 def not_found(e):

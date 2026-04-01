@@ -4,7 +4,7 @@ import re
 import json
 import requests as req
 from datetime import datetime
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, jsonify
 from flask_login import login_required, current_user
 from db import db
 from models import Setup, SetupParam
@@ -180,6 +180,39 @@ def detail(setup_id):
         tabs[tab][sect].append(row)
 
     return render_template('setup_detail.html', setup=setup, tabs=tabs, unmapped=unmapped)
+
+
+@bp.post('/api/advisor-notes')
+@login_required
+def advisor_notes():
+    """
+    Called by the Setup Advisor to append telemetry-based recommendations
+    to the most recent matching setup in the library.
+    Accepts JSON: {car_key, track_key, notes}
+    """
+    data      = request.get_json(force=True) or {}
+    car_key   = data.get('car_key', '').strip()
+    track_key = data.get('track_key', '').strip()
+    notes     = data.get('notes', '').strip()
+
+    if not car_key or not track_key or not notes:
+        return jsonify({'error': 'car_key, track_key and notes are required'}), 400
+
+    setup = (Setup.query
+             .filter_by(user_id=current_user.id, car_key=car_key, track_key=track_key)
+             .order_by(Setup.uploaded_at.desc())
+             .first())
+
+    if not setup:
+        return jsonify({'error': 'No matching setup found in library'}), 404
+
+    from datetime import datetime
+    header = f'\n\n--- Advisor notes ({datetime.utcnow().strftime("%Y-%m-%d %H:%M")} UTC) ---\n'
+    existing = setup.notes_text or ''
+    setup.notes_text = (existing + header + notes)[:8000]
+    db.session.commit()
+
+    return jsonify({'ok': True, 'setup_id': setup.id, 'setup_filename': setup.filename})
 
 
 @bp.post('/setups/<setup_id>/delete')
