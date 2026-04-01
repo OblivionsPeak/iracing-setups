@@ -100,6 +100,30 @@ TRACK_ALIASES = {
     # Spa
     'spa':              'spa',
     'francorchamps':    'spa',
+    # Portimão / Algarve
+    'portimao':         'portimao',
+    'algarve':          'portimao',
+    # St. Petersburg
+    'st_pete':          'st_pete',
+    'petersburg':       'st_pete',
+    # Summit Point
+    'summit':           'summit_point',
+    'summit_point':     'summit_point',
+    # The Bend
+    'the_bend':         'the_bend',
+    'bend':             'the_bend',
+    # MotorLand Aragon
+    'aragon':           'aragon',
+    'motorland':        'aragon',
+    # Misano
+    'misano':           'misano',
+    'simoncelli':       'misano',
+    # Sachsenring
+    'sachsenring':      'sachsenring',
+    # Miami
+    'miami':            'miami',
+    # Adelaide
+    'adelaide':         'adelaide',
 }
 
 # Lowercase car folder name → car_key (iRacing folder names match our keys)
