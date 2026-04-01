@@ -173,12 +173,18 @@ def scan_start():
         car_display = car_display_name(car_key)
         car_cls = car_class(car_key)
 
+        # Walk the car folder recursively to catch setups in subfolders
         try:
-            sto_files = [f for f in os.listdir(folder_path) if f.lower().endswith('.sto')]
+            sto_files = [
+                (dirpath, f)
+                for dirpath, _, files in os.walk(folder_path)
+                for f in sorted(files)
+                if f.lower().endswith('.sto')
+            ]
         except PermissionError:
             continue
 
-        for filename in sorted(sto_files):
+        for dirpath, filename in sto_files:
             if _already_imported(current_user.id, car_key, filename):
                 skipped += 1
                 continue
@@ -188,7 +194,7 @@ def scan_start():
             setup_type = _infer_setup_type(stem)
 
             items.append({
-                'abs_path':        os.path.join(folder_path, filename),
+                'abs_path':        os.path.join(dirpath, filename),
                 'filename':        filename,
                 'car_key':         car_key,
                 'car_name':        car_display,
