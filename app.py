@@ -3,8 +3,11 @@ iRacing Setup Manager
 Multi-user setup catalog, comparison, and recommendation tool.
 """
 import os
+import logging
 from dotenv import load_dotenv
 load_dotenv()
+
+logging.basicConfig(level=logging.INFO)
 
 from flask import Flask, render_template, redirect, url_for
 from flask_login import LoginManager, current_user

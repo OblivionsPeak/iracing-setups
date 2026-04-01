@@ -122,7 +122,7 @@ def upload():
                 label    = row.get('label', ''),
                 value    = row.get('metric_value', ''),
             ))
-    db.session.bulk_save_objects(params)
+    db.session.add_all(params)
     db.session.commit()
 
     flash(f'Uploaded: {car_display_name(car_key)} at {track_display_name(track_key)}.', 'success')
