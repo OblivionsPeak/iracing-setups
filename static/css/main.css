@@ -400,6 +400,18 @@ select.form-control { cursor: pointer; }
   line-height: 1.7;
 }
 
+/* ── Track comparison ─────────────────────────────────────────────────────── */
+.track-chars { display: flex; flex-direction: column; gap: 6px; }
+.tc-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid rgba(48,54,61,0.4); font-size: 14px; }
+.tc-row:last-child { border-bottom: none; }
+.tc-label { color: var(--muted); font-size: 13px; }
+.tc-val { font-weight: 600; }
+.tc-changed { color: var(--warning); }
+.tc-df-low       { color: #60a5fa; }
+.tc-df-medium    { color: #a3e635; }
+.tc-df-high      { color: var(--warning); }
+.tc-df-very_high { color: #f87171; }
+
 /* ── Scan ─────────────────────────────────────────────────────────────────── */
 .scan-spinner {
   width: 36px; height: 36px;

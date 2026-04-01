@@ -10,10 +10,26 @@
 </div>
 
 {% if best %}
-<div class="recommend-card">
-  <h2>{{ best.car_display }}</h2>
-  <div style="font-size:15px; color:var(--muted); margin-bottom:4px;">{{ best.track_display }} · <span style="text-transform:capitalize;">{{ best.setup_type }}</span></div>
-  <div style="font-size:13px; color:var(--muted); margin-bottom:20px; font-style:italic;">{{ reason_text }}</div>
+
+<!-- Recommended setup card -->
+<div class="recommend-card" style="margin-bottom:16px;">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+    <div>
+      <h2 style="margin-bottom:4px;">{{ best.filename }}</h2>
+      <div style="font-size:14px; color:var(--muted);">
+        {{ best.car_name }} &nbsp;·&nbsp; {{ best.track_name }} &nbsp;·&nbsp;
+        <span style="text-transform:capitalize;">{{ best.setup_type }}</span>
+      </div>
+    </div>
+    {% if reason == 'exact_match' %}
+      <span style="background:#0d2d1a; color:#3fb950; border:1px solid #1a5c2a; padding:4px 14px; border-radius:20px; font-size:13px; font-weight:600; white-space:nowrap;">Exact Match</span>
+    {% elif reason == 'very_similar' %}
+      <span style="background:#0c1a3d; color:#93c5fd; border:1px solid #1f3a7a; padding:4px 14px; border-radius:20px; font-size:13px; font-weight:600; white-space:nowrap;">{{ score }}% Match</span>
+    {% else %}
+      <span style="background:#2d2009; color:var(--warning); border:1px solid #6e4b0f; padding:4px 14px; border-radius:20px; font-size:13px; font-weight:600; white-space:nowrap;">{{ score }}% Match</span>
+    {% endif %}
+  </div>
+
   <div style="display:flex; gap:10px; flex-wrap:wrap;">
     <a href="/setups/{{ best.id }}" class="btn btn-primary">View Full Setup</a>
     <a href="/setups/{{ best.id }}/download" class="btn btn-secondary">↓ Download .sto</a>
@@ -21,12 +37,70 @@
   </div>
 </div>
 
-{% if reason != 'exact_match' %}
-<div class="card" style="background:rgba(210,153,34,0.06); border-color:var(--warning);">
+<!-- Track comparison -->
+{% if reason != 'exact_match' and src_chars and tgt_chars %}
+<div class="card" style="margin-bottom:16px;">
+  <div class="card-title" style="margin-bottom:16px;">Track Comparison</div>
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+
+    <div>
+      <div style="font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.4px; margin-bottom:10px;">
+        Source — {{ source_track }}
+      </div>
+      <div class="track-chars">
+        <div class="tc-row"><span class="tc-label">Downforce</span><span class="tc-val tc-df-{{ src_chars.downforce }}">{{ src_chars.downforce | replace('_', ' ') | title }}</span></div>
+        <div class="tc-row"><span class="tc-label">Style</span><span class="tc-val">{{ src_chars.style | replace('_', ' ') | title }}</span></div>
+        <div class="tc-row"><span class="tc-label">Braking</span><span class="tc-val">{{ src_chars.braking | title }}</span></div>
+        <div class="tc-row"><span class="tc-label">Tyre Stress</span><span class="tc-val">{{ src_chars.tire_stress | title }}</span></div>
+        <div class="tc-row"><span class="tc-label">Bumpy</span><span class="tc-val">{{ 'Yes' if src_chars.bumpy else 'No' }}</span></div>
+      </div>
+    </div>
+
+    <div>
+      <div style="font-size:12px; font-weight:600; color:var(--accent); text-transform:uppercase; letter-spacing:0.4px; margin-bottom:10px;">
+        Target — {{ track_display }}
+      </div>
+      <div class="track-chars">
+        {% set df_changed = src_chars.downforce != tgt_chars.downforce %}
+        {% set br_changed = src_chars.braking != tgt_chars.braking %}
+        {% set ts_changed = src_chars.tire_stress != tgt_chars.tire_stress %}
+        {% set st_changed = src_chars.style != tgt_chars.style %}
+        {% set bu_changed = src_chars.bumpy != tgt_chars.bumpy %}
+        <div class="tc-row"><span class="tc-label">Downforce</span><span class="tc-val tc-df-{{ tgt_chars.downforce }} {{ 'tc-changed' if df_changed }}">{{ tgt_chars.downforce | replace('_', ' ') | title }}{{ ' ↑' if tgt_chars.downforce > src_chars.downforce else ' ↓' if tgt_chars.downforce < src_chars.downforce else '' }}</span></div>
+        <div class="tc-row"><span class="tc-label">Style</span><span class="tc-val {{ 'tc-changed' if st_changed }}">{{ tgt_chars.style | replace('_', ' ') | title }}</span></div>
+        <div class="tc-row"><span class="tc-label">Braking</span><span class="tc-val {{ 'tc-changed' if br_changed }}">{{ tgt_chars.braking | title }}</span></div>
+        <div class="tc-row"><span class="tc-label">Tyre Stress</span><span class="tc-val {{ 'tc-changed' if ts_changed }}">{{ tgt_chars.tire_stress | title }}</span></div>
+        <div class="tc-row"><span class="tc-label">Bumpy</span><span class="tc-val {{ 'tc-changed' if bu_changed }}">{{ 'Yes' if tgt_chars.bumpy else 'No' }}</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endif %}
+
+<!-- Adjustment advice -->
+{% if advice %}
+<div class="card" style="border-color:var(--warning); background:rgba(210,153,34,0.04); margin-bottom:16px;">
+  <div class="card-title" style="color:var(--warning);">Setup Adjustments for {{ track_display }}</div>
+  <p style="font-size:13px; color:var(--muted); margin-bottom:14px;">
+    This setup is from {{ source_track }}. Based on the differences between the two tracks, here's what to change:
+  </p>
+  <ul style="list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:10px;">
+    {% for tip in advice %}
+    <li style="display:flex; gap:10px; font-size:14px; line-height:1.5;">
+      <span style="color:var(--warning); flex-shrink:0; margin-top:1px;">›</span>
+      <span>{{ tip }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  <div style="margin-top:16px; border-top:1px solid var(--border); padding-top:14px;">
+    <a href="/setups/upload" class="btn btn-secondary btn-sm">Upload a dedicated {{ track_display }} setup</a>
+  </div>
+</div>
+{% elif reason != 'exact_match' %}
+<div class="card" style="border-color:var(--warning); background:rgba(210,153,34,0.04);">
   <div style="font-size:13px; color:var(--warning);">
-    ⚠ This is not an exact match for {{ track_display }}.
-    Adjust aero (wing angle), ride heights, and brake bias to suit the track before your session.
-    Consider uploading a dedicated setup for {{ track_display }} to improve future recommendations.
+    Not an exact match for {{ track_display }}. Fine-tune as needed before your session.
   </div>
   <div style="margin-top:12px;">
     <a href="/setups/upload" class="btn btn-secondary btn-sm">Upload a {{ track_display }} setup</a>
@@ -37,8 +111,11 @@
 {% else %}
 <div class="empty-state">
   <h3>No {{ car_display }} setups found</h3>
-  <p>You don't have any setups for the {{ car_display }} in your library yet.</p>
-  <a href="/setups/upload" class="btn btn-primary">Upload a Setup</a>
+  <p>Upload or scan your iRacing folder to add setups for the {{ car_display }}.</p>
+  <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+    <a href="/scan/review" class="btn btn-primary">Scan iRacing Folder</a>
+    <a href="/setups/upload" class="btn btn-secondary">Upload Manually</a>
+  </div>
 </div>
 {% endif %}
 {% endblock %}
