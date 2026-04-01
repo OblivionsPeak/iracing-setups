@@ -78,49 +78,75 @@ def _strip_suffixes(stem: str) -> str:
     return s
 
 
-def _fuzzy_match_track(stem: str) -> tuple[str, str, float]:
+def _try_match(candidate: str) -> tuple[str, str, float]:
     """
-    Try to match a filename stem to a track key.
-    Returns (track_key, track_name, confidence) where confidence 0.0–1.0.
+    Try to match a single candidate string to a track key.
+    Returns (track_key, track_name, confidence) or ('', '', 0.0).
     """
-    cleaned = _strip_suffixes(stem)
+    if not candidate or len(candidate) < 3:
+        return '', '', 0.0
 
-    # 1. Alias lookup
-    if cleaned in TRACK_ALIASES:
-        key = TRACK_ALIASES[cleaned]
+    # Alias lookup
+    if candidate in TRACK_ALIASES:
+        key = TRACK_ALIASES[candidate]
         if key in TRACKS:
             return key, TRACKS[key]['name'], 1.0
 
-    # 2. Exact key match
-    if cleaned in TRACKS:
-        return cleaned, TRACKS[cleaned]['name'], 1.0
+    # Exact key match
+    if candidate in TRACKS:
+        return candidate, TRACKS[candidate]['name'], 1.0
 
-    # 3. Partial key match (cleaned is a prefix/substring of a key)
-    partial = [k for k in TRACKS if k.startswith(cleaned) or cleaned.startswith(k)]
+    # Prefix/substring of a key (only when unambiguous)
+    partial = [k for k in TRACKS if k.startswith(candidate) or candidate.startswith(k)]
     if len(partial) == 1:
         key = partial[0]
-        ratio = difflib.SequenceMatcher(None, cleaned, key).ratio()
-        if ratio >= 0.7:
+        ratio = difflib.SequenceMatcher(None, candidate, key).ratio()
+        if ratio >= 0.65:
             return key, TRACKS[key]['name'], ratio
 
-    # 4. difflib fuzzy against all keys
-    track_keys = list(TRACKS.keys())
-    matches = difflib.get_close_matches(cleaned, track_keys, n=1, cutoff=0.55)
+    # difflib fuzzy against all keys
+    matches = difflib.get_close_matches(candidate, list(TRACKS.keys()), n=1, cutoff=0.6)
     if matches:
         key = matches[0]
-        ratio = difflib.SequenceMatcher(None, cleaned, key).ratio()
+        ratio = difflib.SequenceMatcher(None, candidate, key).ratio()
         return key, TRACKS[key]['name'], ratio
 
-    # 5. Match against display name words (e.g. 'spa' in 'Circuit de Spa-Francorchamps')
+    # Match against significant words in display names
     for key, info in TRACKS.items():
         name_words = re.split(r'[\s\-()]+', info['name'].lower())
         for word in name_words:
-            if len(word) >= 4 and (word == cleaned or cleaned.startswith(word) or word.startswith(cleaned)):
-                ratio = difflib.SequenceMatcher(None, cleaned, word).ratio()
-                if ratio >= 0.8:
-                    return key, info['name'], ratio
+            if len(word) >= 4 and word == candidate:
+                return key, info['name'], 1.0
 
     return '', '', 0.0
+
+
+def _fuzzy_match_track(stem: str) -> tuple[str, str, float]:
+    """
+    Try to match a filename stem to a track key by attempting the full
+    cleaned stem, then every n-gram of tokens (1, 2, 3 tokens) extracted
+    from the filename. Returns the highest-confidence result found.
+    """
+    normalized = stem.lower().replace('-', '_').replace(' ', '_')
+
+    # Build all candidates to try, in priority order:
+    # 1. Full stem with suffixes stripped
+    # 2. All 3-token, 2-token, 1-token windows from the raw token list
+    tokens = [t for t in re.split(r'[_\s]+', normalized) if t]
+    candidates = [_strip_suffixes(normalized)]
+    for n in (3, 2, 1):
+        for i in range(len(tokens) - n + 1):
+            candidates.append('_'.join(tokens[i:i + n]))
+
+    best_key, best_name, best_conf = '', '', 0.0
+    for c in candidates:
+        key, name, conf = _try_match(c)
+        if conf > best_conf:
+            best_key, best_name, best_conf = key, name, conf
+        if best_conf == 1.0:
+            break
+
+    return best_key, best_name, best_conf
 
 
 def _infer_setup_type(stem: str) -> str:
@@ -203,7 +229,7 @@ def scan_start():
                 'track_name':      track_name,
                 'track_confidence': round(confidence, 2),
                 'setup_type':      setup_type,
-                'needs_review':    confidence < 0.75 or not track_key,
+                'needs_review':    confidence < 0.65 or not track_key,
             })
 
     return jsonify({'found': len(items), 'skipped': skipped, 'items': items})
