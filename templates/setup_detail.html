@@ -18,8 +18,8 @@
 
 <div style="font-size:13px; color:var(--muted); margin-bottom:20px;">
   File: {{ setup.filename }} &nbsp;·&nbsp;
-  Uploaded {{ setup.uploaded_at[:10] if setup.uploaded_at else '—' }}
-  {% if setup.last_used_at %} &nbsp;·&nbsp; Last downloaded {{ setup.last_used_at[:10] }}{% endif %}
+  Uploaded {{ setup.uploaded_at.strftime('%Y-%m-%d') if setup.uploaded_at else '—' }}
+  {% if setup.last_used_at %} &nbsp;·&nbsp; Last downloaded {{ setup.last_used_at.strftime('%Y-%m-%d') }}{% endif %}
 </div>
 
 <!-- Tabs -->
