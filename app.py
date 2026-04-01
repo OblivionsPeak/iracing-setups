@@ -9,10 +9,13 @@ load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 
-from flask import Flask, render_template, redirect, url_for
-from flask_login import LoginManager, current_user
+from flask import Flask, render_template, redirect, url_for, request
+from flask_login import LoginManager, current_user, login_user
 from config import SECRET_KEY, DATABASE_URL, UPLOAD_FOLDER
 from db import db
+
+LOCAL_MODE = os.environ.get('LOCAL_MODE') == '1'
+LOCAL_USER_EMAIL = 'local@iracing-setups.local'
 
 app = Flask(
     __name__,
@@ -55,6 +58,31 @@ app.register_blueprint(scan_bp)
 with app.app_context():
     db.create_all()
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    if LOCAL_MODE:
+        # Ensure the local user exists
+        from models import User
+        if not User.query.filter_by(email=LOCAL_USER_EMAIL).first():
+            import secrets as _s
+            u = User(email=LOCAL_USER_EMAIL, display_name='Local User')
+            u.set_password(_s.token_hex(32))
+            db.session.add(u)
+            db.session.commit()
+
+
+if LOCAL_MODE:
+    @app.before_request
+    def auto_login():
+        """In local mode, silently log in as the local user on every request."""
+        skip = (
+            request.path.startswith('/static') or
+            current_user.is_authenticated
+        )
+        if skip:
+            return
+        from models import User
+        user = User.query.filter_by(email=LOCAL_USER_EMAIL).first()
+        if user:
+            login_user(user, remember=True)
 
 
 @app.get('/')

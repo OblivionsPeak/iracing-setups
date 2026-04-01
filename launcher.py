@@ -33,6 +33,7 @@ with open(CONFIG_FILE, 'w') as f:
 
 # Set env vars before importing app
 os.environ['FLASK_SECRET_KEY'] = _secret_key
+os.environ['LOCAL_MODE'] = '1'   # single-user exe — skip login entirely
 os.environ.setdefault('DATABASE_URL', f"sqlite:///{os.path.join(DATA_DIR, 'iracing_setups.db')}")
 os.environ.setdefault('UPLOAD_FOLDER', os.path.join(DATA_DIR, 'setups'))
 
