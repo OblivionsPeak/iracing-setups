@@ -11,6 +11,7 @@ CARS = {
     'amvantagegt3':             {'name': 'Aston Martin Vantage GT3',         'class': 'GT3'},
     'amvantageevogt3':          {'name': 'Aston Martin Vantage AMR GT3 EVO', 'class': 'GT3'},
     'audir8lmsevo2gt3':         {'name': 'Audi R8 LMS GT3 EVO II',           'class': 'GT3'},
+    'bmwm2csr':                 {'name': 'BMW M2 CS Racing',                  'class': 'TCR'},
     'bmwm4gt3':                 {'name': 'BMW M4 GT3',                       'class': 'GT3'},
     'bmwz4gt3':                 {'name': 'BMW Z4 GT3',                       'class': 'GT3'},
     'chevyvettez06rgt3':        {'name': 'Chevrolet Corvette Z06 GT3.R',     'class': 'GT3'},
