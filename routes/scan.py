@@ -39,6 +39,8 @@ TRACK_ALIASES = {
     # Nürburgring
     'nords':            'nurburgring_nordschleife',
     'nordschleife':     'nurburgring_nordschleife',
+    'gesamtstrecke':    'nurburgring_nordschleife',
+    'vln':              'nurburgring_nordschleife',
     'nurb':             'nurburgring_gp',
     'nurburgring':      'nurburgring_gp',
     # Le Mans
@@ -275,6 +277,17 @@ def scan_start():
             stem = os.path.splitext(filename)[0]
             track_key, track_name, confidence = _fuzzy_match_track(stem)
             setup_type = _infer_setup_type(stem)
+
+            # If filename gave a weak match, also try each subfolder name in the path
+            if confidence < 0.65:
+                rel = os.path.relpath(dirpath, folder_path)
+                path_parts = [p for p in re.split(r'[/\\]', rel) if p and p != '.']
+                for part in reversed(path_parts):  # innermost first (most specific)
+                    pk, pn, pc = _fuzzy_match_track(part)
+                    if pc > confidence:
+                        track_key, track_name, confidence = pk, pn, pc
+                    if confidence >= 0.65:
+                        break
 
             items.append({
                 'abs_path':        os.path.join(dirpath, filename),

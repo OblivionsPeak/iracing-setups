@@ -23,7 +23,7 @@ CARS = {
     'mercedesamggt3':           {'name': 'Mercedes-AMG GT3',                 'class': 'GT3'},
     'mercedesamgevogt3':        {'name': 'Mercedes-AMG GT3 EVO',             'class': 'GT3'},
     'mclaren720sgt3':           {'name': 'McLaren 720S GT3 EVO',             'class': 'GT3'},
-    'porsche911rgt3':           {'name': 'Porsche 911 GT3 R (992)',          'class': 'GT3'},
+    'porsche911rgt3':           {'name': 'Porsche 911 GT3 R (991)',          'class': 'GT3'},
     'porsche992rgt3':           {'name': 'Porsche 911 GT3 R (992)',          'class': 'GT3'},
 
     # ── GT4 ──────────────────────────────────────────────────────────────────
@@ -33,7 +33,8 @@ CARS = {
     'bmwm4gt4':                 {'name': 'BMW M4 GT4',                       'class': 'GT4'},
     'chevycamarogt4':           {'name': 'Chevrolet Camaro GT4.R',           'class': 'GT4'},
     'fordmustanggt4':           {'name': 'Ford Mustang GT4',                 'class': 'GT4'},
-    'hyundaivelostern':         {'name': 'Hyundai Elantra N GT4',            'class': 'GT4'},
+    'hyundaivelostern':         {'name': 'Hyundai Veloster N TC',            'class': 'TCR'},
+    'hyundaielantracn7':        {'name': 'Hyundai Elantra N TC',             'class': 'TCR'},
     'ktmxbowgt4':               {'name': 'KTM X-Bow GT4',                   'class': 'GT4'},
     'maseratigranturismo':      {'name': 'Maserati MC GT4',                  'class': 'GT4'},
     'mclaren570sgt4':           {'name': 'McLaren 570S GT4',                 'class': 'GT4'},
@@ -66,7 +67,7 @@ CARS = {
 }
 
 # Class ordering for display grouping
-CLASS_ORDER = ['GT3', 'GT4', 'GTE', 'LMP2', 'LMP3', 'GTP', 'Porsche Cup', 'Other']
+CLASS_ORDER = ['GT3', 'GT4', 'GTE', 'LMP2', 'LMP3', 'GTP', 'TCR', 'Porsche Cup', 'Other']
 
 
 def get_car(car_key: str) -> dict:
